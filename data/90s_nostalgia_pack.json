@@ -1,0 +1,418 @@
+[
+  {
+    "text": "Believe it or not Jim Carrey can do a dead-on impression of ______.",
+    "type": "prompt",
+    "regions": {
+      "us": true,
+      "uk": true,
+      "ca": true,
+      "au": true,
+      "intl": true
+    },
+    "pick": 1
+  },
+  {
+    "text": "How did Stella get her groove back?",
+    "type": "prompt",
+    "regions": {
+      "us": true,
+      "uk": true,
+      "ca": true,
+      "au": true,
+      "intl": true
+    },
+    "pick": 1
+  },
+  {
+    "text": "I can show you ______, shining, shimmering, splendid.",
+    "type": "prompt",
+    "regions": {
+      "us": true,
+      "uk": true,
+      "ca": true,
+      "au": true,
+      "intl": true
+    },
+    "pick": 1
+  },
+  {
+    "text": "I'm a bitch, I'm a lover, I'm a child, I'm ______.",
+    "type": "prompt",
+    "regions": {
+      "us": true,
+      "uk": true,
+      "ca": true,
+      "au": true,
+      "intl": true
+    },
+    "pick": 1
+  },
+  {
+    "text": "If I were a Spice Girl, I’d be “______ Spice.”",
+    "type": "prompt",
+    "regions": {
+      "us": true,
+      "uk": true,
+      "ca": true,
+      "au": true,
+      "intl": true
+    },
+    "pick": 1
+  },
+  {
+    "text": "It's Morphin' Time! Mastodon! Pterodactyl! Triceratops! Sabertooth Tiger! ______!",
+    "type": "prompt",
+    "regions": {
+      "us": true,
+      "uk": true,
+      "ca": true,
+      "au": true,
+      "intl": true
+    },
+    "pick": 1
+  },
+  {
+    "text": "Siskel and Ebert have panned ______ as \"poorly conceived\" and \"sloppily executed.\"",
+    "type": "prompt",
+    "regions": {
+      "us": true,
+      "uk": true,
+      "ca": true,
+      "au": true,
+      "intl": true
+    },
+    "pick": 1
+  },
+  {
+    "text": "Tonight on SNICK: \"Are You Afriad of ______?",
+    "type": "prompt",
+    "regions": {
+      "us": true,
+      "uk": true,
+      "ca": true,
+      "au": true,
+      "intl": true
+    },
+    "pick": 1
+  },
+  {
+    "text": "Up next on Nickelodeon: \"Clarissa Explains ______.\"",
+    "type": "prompt",
+    "regions": {
+      "us": true,
+      "uk": true,
+      "ca": true,
+      "au": true,
+      "intl": true
+    },
+    "pick": 1
+  },
+  {
+    "text": "A bus that will explode if it goes under 50 miles per hour.",
+    "type": "response",
+    "regions": {
+      "us": true,
+      "uk": true,
+      "ca": true,
+      "au": true,
+      "intl": true
+    }
+  },
+  {
+    "text": "A mulatto, an albino, a mosquito, and my libido.",
+    "type": "response",
+    "regions": {
+      "us": true,
+      "uk": true,
+      "ca": true,
+      "au": true,
+      "intl": true
+    }
+  },
+  {
+    "text": "A threesome with 1996 Denise Richards and 1999 Denise Richards.",
+    "type": "response",
+    "regions": {
+      "us": true,
+      "uk": true,
+      "ca": true,
+      "au": true,
+      "intl": true
+    }
+  },
+  {
+    "text": "Angels interfering in an otherwise fair baseball game.",
+    "type": "response",
+    "regions": {
+      "us": true,
+      "uk": true,
+      "ca": true,
+      "au": true,
+      "intl": true
+    }
+  },
+  {
+    "text": "Cool 90s up-in-the-front hair.",
+    "type": "response",
+    "regions": {
+      "us": true,
+      "uk": true,
+      "ca": true,
+      "au": true,
+      "intl": true
+    }
+  },
+  {
+    "text": "Deregulating the mortgage market.",
+    "type": "response",
+    "regions": {
+      "us": true,
+      "uk": true,
+      "ca": true,
+      "au": true,
+      "intl": true
+    }
+  },
+  {
+    "text": "Freeing Willy.",
+    "type": "response",
+    "regions": {
+      "us": true,
+      "uk": true,
+      "ca": true,
+      "au": true,
+      "intl": true
+    }
+  },
+  {
+    "text": "Getting caught up in the CROSSFIRE™.",
+    "type": "response",
+    "regions": {
+      "us": true,
+      "uk": true,
+      "ca": true,
+      "au": true,
+      "intl": true
+    }
+  },
+  {
+    "text": "Getting jiggy with it, as it were.",
+    "type": "response",
+    "regions": {
+      "us": true,
+      "uk": true,
+      "ca": true,
+      "au": true,
+      "intl": true
+    }
+  },
+  {
+    "text": "Jerking off to a 10-second RealMedia clip.",
+    "type": "response",
+    "regions": {
+      "us": true,
+      "uk": true,
+      "ca": true,
+      "au": true,
+      "intl": true
+    }
+  },
+  {
+    "text": "Kurt Cobain's death.",
+    "type": "response",
+    "regions": {
+      "us": true,
+      "uk": true,
+      "ca": true,
+      "au": true,
+      "intl": true
+    }
+  },
+  {
+    "text": "Letting Tim Allen do the Home Improvement grunt into my pussy.",
+    "type": "response",
+    "regions": {
+      "us": true,
+      "uk": true,
+      "ca": true,
+      "au": true,
+      "intl": true
+    }
+  },
+  {
+    "text": "Liking big butts and not being able to lie about it.",
+    "type": "response",
+    "regions": {
+      "us": true,
+      "uk": true,
+      "ca": true,
+      "au": true,
+      "intl": true
+    }
+  },
+  {
+    "text": "Log™.",
+    "type": "response",
+    "regions": {
+      "us": true,
+      "uk": true,
+      "ca": true,
+      "au": true,
+      "intl": true
+    }
+  },
+  {
+    "text": "Painting with all the colors of the wind.",
+    "type": "response",
+    "regions": {
+      "us": true,
+      "uk": true,
+      "ca": true,
+      "au": true,
+      "intl": true
+    }
+  },
+  {
+    "text": "Pamela Anderson's boobs running in slow motion.",
+    "type": "response",
+    "regions": {
+      "us": true,
+      "uk": true,
+      "ca": true,
+      "au": true,
+      "intl": true
+    }
+  },
+  {
+    "text": "Patti Mayonnaise.",
+    "type": "response",
+    "regions": {
+      "us": true,
+      "uk": true,
+      "ca": true,
+      "au": true,
+      "intl": true
+    }
+  },
+  {
+    "text": "Pizza in the morning, pizza in the evening, pizza at supper time.",
+    "type": "response",
+    "regions": {
+      "us": true,
+      "uk": true,
+      "ca": true,
+      "au": true,
+      "intl": true
+    }
+  },
+  {
+    "text": "Pure Moods, Vol. 1.",
+    "type": "response",
+    "regions": {
+      "us": true,
+      "uk": true,
+      "ca": true,
+      "au": true,
+      "intl": true
+    }
+  },
+  {
+    "text": "Several Michael Keatons",
+    "type": "response",
+    "regions": {
+      "us": true,
+      "uk": true,
+      "ca": true,
+      "au": true,
+      "intl": true
+    }
+  },
+  {
+    "text": "Stabbing the shit out of a Capri Sun.",
+    "type": "response",
+    "regions": {
+      "us": true,
+      "uk": true,
+      "ca": true,
+      "au": true,
+      "intl": true
+    }
+  },
+  {
+    "text": "Sucking the president's dick.",
+    "type": "response",
+    "regions": {
+      "us": true,
+      "uk": true,
+      "ca": true,
+      "au": true,
+      "intl": true
+    }
+  },
+  {
+    "text": "Sunny D! Alright!",
+    "type": "response",
+    "regions": {
+      "us": true,
+      "uk": true,
+      "ca": true,
+      "au": true,
+      "intl": true
+    }
+  },
+  {
+    "text": "The 1996 Chicago Bulls.",
+    "type": "response",
+    "regions": {
+      "us": true,
+      "uk": true,
+      "ca": true,
+      "au": true,
+      "intl": true
+    }
+  },
+  {
+    "text": "The Great Cornholio.",
+    "type": "response",
+    "regions": {
+      "us": true,
+      "uk": true,
+      "ca": true,
+      "au": true,
+      "intl": true
+    }
+  },
+  {
+    "text": "The Y2K bug.",
+    "type": "response",
+    "regions": {
+      "us": true,
+      "uk": true,
+      "ca": true,
+      "au": true,
+      "intl": true
+    }
+  },
+  {
+    "text": "Wearing Nicolas Cage's face.",
+    "type": "response",
+    "regions": {
+      "us": true,
+      "uk": true,
+      "ca": true,
+      "au": true,
+      "intl": true
+    }
+  },
+  {
+    "text": "Yelling \"girl power!\" and doing a high kick.",
+    "type": "response",
+    "regions": {
+      "us": true,
+      "uk": true,
+      "ca": true,
+      "au": true,
+      "intl": true
+    }
+  }
+]

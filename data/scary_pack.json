@@ -1,0 +1,337 @@
+[
+  {
+    "text": "\"I think I'm safe,\" she whispered. But then, out of nowhere, ______!",
+    "type": "prompt",
+    "regions": {
+      "us": true,
+      "uk": true,
+      "ca": true,
+      "au": true,
+      "intl": true
+    },
+    "pick": 1
+  },
+  {
+    "text": "Anne screamed. On her mirror was a message scrawled in blood: \"I AM ______.\"",
+    "type": "prompt",
+    "regions": {
+      "us": true,
+      "uk": true,
+      "ca": true,
+      "au": true,
+      "intl": true
+    },
+    "pick": 1
+  },
+  {
+    "text": "Guillermo Del Toro is the master of supernatural horror, but even he is afraid of ______.",
+    "type": "prompt",
+    "regions": {
+      "us": true,
+      "uk": true,
+      "ca": true,
+      "au": true,
+      "intl": true
+    },
+    "pick": 1
+  },
+  {
+    "text": "OH SHIT!\r\n______ comin' out of Jumanji!",
+    "type": "prompt",
+    "regions": {
+      "us": true,
+      "uk": true,
+      "ca": true,
+      "au": true,
+      "intl": true
+    },
+    "pick": 1
+  },
+  {
+    "text": "Tonight on Murder Files: An ordinary man, driven to kill by ______.",
+    "type": "prompt",
+    "regions": {
+      "us": true,
+      "uk": true,
+      "ca": true,
+      "au": true,
+      "intl": true
+    },
+    "pick": 1
+  },
+  {
+    "text": "A big misunderstanding involving decapitations.",
+    "type": "response",
+    "regions": {
+      "us": true,
+      "uk": true,
+      "ca": true,
+      "au": true,
+      "intl": true
+    }
+  },
+  {
+    "text": "A CD of haunted house sound effects.",
+    "type": "response",
+    "regions": {
+      "us": true,
+      "uk": true,
+      "ca": true,
+      "au": true,
+      "intl": true
+    }
+  },
+  {
+    "text": "A cursed Fleshlight that makes you rapidly age when you fuck it.",
+    "type": "response",
+    "regions": {
+      "us": true,
+      "uk": true,
+      "ca": true,
+      "au": true,
+      "intl": true
+    }
+  },
+  {
+    "text": "A gremlin who spanks your wonderful ass with a fly swatter.",
+    "type": "response",
+    "regions": {
+      "us": true,
+      "uk": true,
+      "ca": true,
+      "au": true,
+      "intl": true
+    }
+  },
+  {
+    "text": "A mannequin that gets a little closer every time you look away.",
+    "type": "response",
+    "regions": {
+      "us": true,
+      "uk": true,
+      "ca": true,
+      "au": true,
+      "intl": true
+    }
+  },
+  {
+    "text": "Agonizingly transforming into a trombone.",
+    "type": "response",
+    "regions": {
+      "us": true,
+      "uk": true,
+      "ca": true,
+      "au": true,
+      "intl": true
+    }
+  },
+  {
+    "text": "An iguana that says \"Ooh la la!\" in a threatening way.",
+    "type": "response",
+    "regions": {
+      "us": true,
+      "uk": true,
+      "ca": true,
+      "au": true,
+      "intl": true
+    }
+  },
+  {
+    "text": "Awakening an ancient evil.",
+    "type": "response",
+    "regions": {
+      "us": true,
+      "uk": true,
+      "ca": true,
+      "au": true,
+      "intl": true
+    }
+  },
+  {
+    "text": "Chanting in Latin.",
+    "type": "response",
+    "regions": {
+      "us": true,
+      "uk": true,
+      "ca": true,
+      "au": true,
+      "intl": true
+    }
+  },
+  {
+    "text": "Crawling all over the walls and ceiling like a dumbass.",
+    "type": "response",
+    "regions": {
+      "us": true,
+      "uk": true,
+      "ca": true,
+      "au": true,
+      "intl": true
+    }
+  },
+  {
+    "text": "Farting the X-Files theme.",
+    "type": "response",
+    "regions": {
+      "us": true,
+      "uk": true,
+      "ca": true,
+      "au": true,
+      "intl": true
+    }
+  },
+  {
+    "text": "Getting disemboweled.",
+    "type": "response",
+    "regions": {
+      "us": true,
+      "uk": true,
+      "ca": true,
+      "au": true,
+      "intl": true
+    }
+  },
+  {
+    "text": "Having unprotected sex with The Blob.",
+    "type": "response",
+    "regions": {
+      "us": true,
+      "uk": true,
+      "ca": true,
+      "au": true,
+      "intl": true
+    }
+  },
+  {
+    "text": "Human sacrifice.",
+    "type": "response",
+    "regions": {
+      "us": true,
+      "uk": true,
+      "ca": true,
+      "au": true,
+      "intl": true
+    }
+  },
+  {
+    "text": "Knowing a bit too much about serial killers.",
+    "type": "response",
+    "regions": {
+      "us": true,
+      "uk": true,
+      "ca": true,
+      "au": true,
+      "intl": true
+    }
+  },
+  {
+    "text": "Night, the scariest half of the day.",
+    "type": "response",
+    "regions": {
+      "us": true,
+      "uk": true,
+      "ca": true,
+      "au": true,
+      "intl": true
+    }
+  },
+  {
+    "text": "Pus.",
+    "type": "response",
+    "regions": {
+      "us": true,
+      "uk": true,
+      "ca": true,
+      "au": true,
+      "intl": true
+    }
+  },
+  {
+    "text": "Putting the lotion on its skin.",
+    "type": "response",
+    "regions": {
+      "us": true,
+      "uk": true,
+      "ca": true,
+      "au": true,
+      "intl": true
+    }
+  },
+  {
+    "text": "Realizing Mom and Dad are now at an age where it wouldn't be that unusual for them to die.",
+    "type": "response",
+    "regions": {
+      "us": true,
+      "uk": true,
+      "ca": true,
+      "au": true,
+      "intl": true
+    }
+  },
+  {
+    "text": "Serving a man his own testicles on a sizzling fajita platter.",
+    "type": "response",
+    "regions": {
+      "us": true,
+      "uk": true,
+      "ca": true,
+      "au": true,
+      "intl": true
+    }
+  },
+  {
+    "text": "Skulls and spiderwebs and shit.",
+    "type": "response",
+    "regions": {
+      "us": true,
+      "uk": true,
+      "ca": true,
+      "au": true,
+      "intl": true
+    }
+  },
+  {
+    "text": "Testing negative for being alive.",
+    "type": "response",
+    "regions": {
+      "us": true,
+      "uk": true,
+      "ca": true,
+      "au": true,
+      "intl": true
+    }
+  },
+  {
+    "text": "The current state of American democracy.",
+    "type": "response",
+    "regions": {
+      "us": true,
+      "uk": true,
+      "ca": true,
+      "au": true,
+      "intl": true
+    }
+  },
+  {
+    "text": "The ghostly specter of a delicious six-foot party sub that disappears when you try to take a bite.",
+    "type": "response",
+    "regions": {
+      "us": true,
+      "uk": true,
+      "ca": true,
+      "au": true,
+      "intl": true
+    }
+  },
+  {
+    "text": "Vagina dentata.",
+    "type": "response",
+    "regions": {
+      "us": true,
+      "uk": true,
+      "ca": true,
+      "au": true,
+      "intl": true
+    }
+  }
+]

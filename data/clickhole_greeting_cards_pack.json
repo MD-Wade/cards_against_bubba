@@ -1,0 +1,172 @@
+[
+  {
+    "text": "Hallmark has invented a new holiday. It's called \"________________ Day.\"",
+    "type": "prompt",
+    "regions": {
+      "us": true,
+      "uk": true,
+      "ca": true,
+      "au": true,
+      "intl": true
+    },
+    "pick": 1
+  },
+  {
+    "text": "Happy Birthday! I love you. Here's ________________.",
+    "type": "prompt",
+    "regions": {
+      "us": true,
+      "uk": true,
+      "ca": true,
+      "au": true,
+      "intl": true
+    },
+    "pick": 1
+  },
+  {
+    "text": "Honey, it's gonna take more than a shitty greeting card to make up for ten years of ________________.",
+    "type": "prompt",
+    "regions": {
+      "us": true,
+      "uk": true,
+      "ca": true,
+      "au": true,
+      "intl": true
+    },
+    "pick": 1
+  },
+  {
+    "text": "I cannot stop smiling about ________________.",
+    "type": "prompt",
+    "regions": {
+      "us": true,
+      "uk": true,
+      "ca": true,
+      "au": true,
+      "intl": true
+    },
+    "pick": 1
+  },
+  {
+    "text": "Roses are red. Violets are blue. I am ________________ and so are you.",
+    "type": "prompt",
+    "regions": {
+      "us": true,
+      "uk": true,
+      "ca": true,
+      "au": true,
+      "intl": true
+    },
+    "pick": 1
+  },
+  {
+    "text": "A one-star Uber driver named \"Wife of Tarantula.\"",
+    "type": "response",
+    "regions": {
+      "us": true,
+      "uk": true,
+      "ca": true,
+      "au": true,
+      "intl": true
+    }
+  },
+  {
+    "text": "An explosion of glitter.",
+    "type": "response",
+    "regions": {
+      "us": true,
+      "uk": true,
+      "ca": true,
+      "au": true,
+      "intl": true
+    }
+  },
+  {
+    "text": "Eating my children.",
+    "type": "response",
+    "regions": {
+      "us": true,
+      "uk": true,
+      "ca": true,
+      "au": true,
+      "intl": true
+    }
+  },
+  {
+    "text": "Emerging from my mother's vagina.",
+    "type": "response",
+    "regions": {
+      "us": true,
+      "uk": true,
+      "ca": true,
+      "au": true,
+      "intl": true
+    }
+  },
+  {
+    "text": "Give me kiss.",
+    "type": "response",
+    "regions": {
+      "us": true,
+      "uk": true,
+      "ca": true,
+      "au": true,
+      "intl": true
+    }
+  },
+  {
+    "text": "Looking like shit.",
+    "type": "response",
+    "regions": {
+      "us": true,
+      "uk": true,
+      "ca": true,
+      "au": true,
+      "intl": true
+    }
+  },
+  {
+    "text": "Luring my husband to the bedroom with a trail of ferret teeth and appearing on the bed in a ferret costume.",
+    "type": "response",
+    "regions": {
+      "us": true,
+      "uk": true,
+      "ca": true,
+      "au": true,
+      "intl": true
+    }
+  },
+  {
+    "text": "Mom's special birthday rimjob.",
+    "type": "response",
+    "regions": {
+      "us": true,
+      "uk": true,
+      "ca": true,
+      "au": true,
+      "intl": true
+    }
+  },
+  {
+    "text": "My five dead husbands.",
+    "type": "response",
+    "regions": {
+      "us": true,
+      "uk": true,
+      "ca": true,
+      "au": true,
+      "intl": true
+    }
+  },
+  {
+    "text": "Turning 70 and still being fuckable.",
+    "type": "response",
+    "regions": {
+      "us": true,
+      "uk": true,
+      "ca": true,
+      "au": true,
+      "intl": true
+    }
+  }
+]

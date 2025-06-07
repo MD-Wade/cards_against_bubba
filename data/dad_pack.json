@@ -1,0 +1,371 @@
+[
+  {
+    "text": "Coming up on Turner Classic Movies:\r\nSean Connery and Alec Baldwin star in \"The Hunt for ______.\"",
+    "type": "prompt",
+    "regions": {
+      "us": true,
+      "uk": true,
+      "ca": true,
+      "au": true,
+      "intl": true
+    },
+    "pick": 1
+  },
+  {
+    "text": "FW: re:\r\nFBI WARNING!!! VIOLENT GANGS USING ______ TO RECRUIT CHILDREN!",
+    "type": "prompt",
+    "regions": {
+      "us": true,
+      "uk": true,
+      "ca": true,
+      "au": true,
+      "intl": true
+    },
+    "pick": 1
+  },
+  {
+    "text": "Hey, kids.\r\nI'm Connor's dad, but you can call me Mr. ______.",
+    "type": "prompt",
+    "regions": {
+      "us": true,
+      "uk": true,
+      "ca": true,
+      "au": true,
+      "intl": true
+    },
+    "pick": 1
+  },
+  {
+    "text": "So apparently Dad was searching Pornhub for \"hot milf ______.\"",
+    "type": "prompt",
+    "regions": {
+      "us": true,
+      "uk": true,
+      "ca": true,
+      "au": true,
+      "intl": true
+    },
+    "pick": 1
+  },
+  {
+    "text": "Whaddya think, money grows on trees? I'm not paying for ______!",
+    "type": "prompt",
+    "regions": {
+      "us": true,
+      "uk": true,
+      "ca": true,
+      "au": true,
+      "intl": true
+    },
+    "pick": 1
+  },
+  {
+    "text": "Young lady, you better knock it off with ______ or you're grounded!",
+    "type": "prompt",
+    "regions": {
+      "us": true,
+      "uk": true,
+      "ca": true,
+      "au": true,
+      "intl": true
+    },
+    "pick": 1
+  },
+  {
+    "text": "A positive male role model.",
+    "type": "response",
+    "regions": {
+      "us": true,
+      "uk": true,
+      "ca": true,
+      "au": true,
+      "intl": true
+    }
+  },
+  {
+    "text": "Coaching the 7th grade girls basketball team.",
+    "type": "response",
+    "regions": {
+      "us": true,
+      "uk": true,
+      "ca": true,
+      "au": true,
+      "intl": true
+    }
+  },
+  {
+    "text": "Dad coming home drunk.",
+    "type": "response",
+    "regions": {
+      "us": true,
+      "uk": true,
+      "ca": true,
+      "au": true,
+      "intl": true
+    }
+  },
+  {
+    "text": "Dad's big sex night.",
+    "type": "response",
+    "regions": {
+      "us": true,
+      "uk": true,
+      "ca": true,
+      "au": true,
+      "intl": true
+    }
+  },
+  {
+    "text": "Dad's famous chili.",
+    "type": "response",
+    "regions": {
+      "us": true,
+      "uk": true,
+      "ca": true,
+      "au": true,
+      "intl": true
+    }
+  },
+  {
+    "text": "Divorce.",
+    "type": "response",
+    "regions": {
+      "us": true,
+      "uk": true,
+      "ca": true,
+      "au": true,
+      "intl": true
+    }
+  },
+  {
+    "text": "Dolby® Digital Surround Sound.",
+    "type": "response",
+    "regions": {
+      "us": true,
+      "uk": true,
+      "ca": true,
+      "au": true,
+      "intl": true
+    }
+  },
+  {
+    "text": "Emotional unavailability.",
+    "type": "response",
+    "regions": {
+      "us": true,
+      "uk": true,
+      "ca": true,
+      "au": true,
+      "intl": true
+    }
+  },
+  {
+    "text": "Finding a place to sit down.",
+    "type": "response",
+    "regions": {
+      "us": true,
+      "uk": true,
+      "ca": true,
+      "au": true,
+      "intl": true
+    }
+  },
+  {
+    "text": "Flirting with the ladies at the bank.",
+    "type": "response",
+    "regions": {
+      "us": true,
+      "uk": true,
+      "ca": true,
+      "au": true,
+      "intl": true
+    }
+  },
+  {
+    "text": "Forty-two years of repressed homosexuality.",
+    "type": "response",
+    "regions": {
+      "us": true,
+      "uk": true,
+      "ca": true,
+      "au": true,
+      "intl": true
+    }
+  },
+  {
+    "text": "Going bald.",
+    "type": "response",
+    "regions": {
+      "us": true,
+      "uk": true,
+      "ca": true,
+      "au": true,
+      "intl": true
+    }
+  },
+  {
+    "text": "Having a bunch of kids by accident.",
+    "type": "response",
+    "regions": {
+      "us": true,
+      "uk": true,
+      "ca": true,
+      "au": true,
+      "intl": true
+    }
+  },
+  {
+    "text": "Having a heart attack.",
+    "type": "response",
+    "regions": {
+      "us": true,
+      "uk": true,
+      "ca": true,
+      "au": true,
+      "intl": true
+    }
+  },
+  {
+    "text": "Kidnapping Liam Neeson's daughter.",
+    "type": "response",
+    "regions": {
+      "us": true,
+      "uk": true,
+      "ca": true,
+      "au": true,
+      "intl": true
+    }
+  },
+  {
+    "text": "Low sperm motility.",
+    "type": "response",
+    "regions": {
+      "us": true,
+      "uk": true,
+      "ca": true,
+      "au": true,
+      "intl": true
+    }
+  },
+  {
+    "text": "Making the printer work.",
+    "type": "response",
+    "regions": {
+      "us": true,
+      "uk": true,
+      "ca": true,
+      "au": true,
+      "intl": true
+    }
+  },
+  {
+    "text": "Mulch.",
+    "type": "response",
+    "regions": {
+      "us": true,
+      "uk": true,
+      "ca": true,
+      "au": true,
+      "intl": true
+    }
+  },
+  {
+    "text": "My tired husband's soft penis.",
+    "type": "response",
+    "regions": {
+      "us": true,
+      "uk": true,
+      "ca": true,
+      "au": true,
+      "intl": true
+    }
+  },
+  {
+    "text": "Puns.",
+    "type": "response",
+    "regions": {
+      "us": true,
+      "uk": true,
+      "ca": true,
+      "au": true,
+      "intl": true
+    }
+  },
+  {
+    "text": "Sitting on the toilet for 45 minutes.",
+    "type": "response",
+    "regions": {
+      "us": true,
+      "uk": true,
+      "ca": true,
+      "au": true,
+      "intl": true
+    }
+  },
+  {
+    "text": "Standing in the middle of the living room holding two remote controls.",
+    "type": "response",
+    "regions": {
+      "us": true,
+      "uk": true,
+      "ca": true,
+      "au": true,
+      "intl": true
+    }
+  },
+  {
+    "text": "Stealing a child's nose and keeping it forever.",
+    "type": "response",
+    "regions": {
+      "us": true,
+      "uk": true,
+      "ca": true,
+      "au": true,
+      "intl": true
+    }
+  },
+  {
+    "text": "The nipples of a man.",
+    "type": "response",
+    "regions": {
+      "us": true,
+      "uk": true,
+      "ca": true,
+      "au": true,
+      "intl": true
+    }
+  },
+  {
+    "text": "The son of a bitch who knocked up my daughter.",
+    "type": "response",
+    "regions": {
+      "us": true,
+      "uk": true,
+      "ca": true,
+      "au": true,
+      "intl": true
+    }
+  },
+  {
+    "text": "Tripping on an object and becoming angry.",
+    "type": "response",
+    "regions": {
+      "us": true,
+      "uk": true,
+      "ca": true,
+      "au": true,
+      "intl": true
+    }
+  },
+  {
+    "text": "What Dad has to say about Muslims.",
+    "type": "response",
+    "regions": {
+      "us": true,
+      "uk": true,
+      "ca": true,
+      "au": true,
+      "intl": true
+    }
+  }
+]

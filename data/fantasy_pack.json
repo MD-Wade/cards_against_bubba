@@ -1,0 +1,438 @@
+[
+  {
+    "text": "And in the end, the dragon was not evil; he just wanted ______.",
+    "type": "prompt",
+    "regions": {
+      "us": true,
+      "uk": true,
+      "ca": true,
+      "au": true,
+      "intl": true
+    },
+    "pick": 1
+  },
+  {
+    "text": "Critics are raving about HBO's new fantasy series, \"______ of ______.\"",
+    "type": "prompt",
+    "regions": {
+      "us": true,
+      "uk": true,
+      "ca": true,
+      "au": true,
+      "intl": true
+    },
+    "pick": 1
+  },
+  {
+    "text": "Critics are raving about HBO's new Game of Thrones spin-off, \"______ of ______.\"",
+    "type": "prompt",
+    "regions": {
+      "us": true,
+      "uk": true,
+      "ca": true,
+      "au": true,
+      "intl": true
+    },
+    "pick": 2
+  },
+  {
+    "text": "Having tired of poetry and music, the immortal elves now fill their days with ______.",
+    "type": "prompt",
+    "regions": {
+      "us": true,
+      "uk": true,
+      "ca": true,
+      "au": true,
+      "intl": true
+    },
+    "pick": 1
+  },
+  {
+    "text": "Legend tells of a princess who has been asleep for a thousand years and can only be awoken by ______.",
+    "type": "prompt",
+    "regions": {
+      "us": true,
+      "uk": true,
+      "ca": true,
+      "au": true,
+      "intl": true
+    },
+    "pick": 1
+  },
+  {
+    "text": "Who blasphemes and bubbles at the center of all infinity, whose name no lips dare speak aloud, and who gnaws hungrily in inconceivable, unlighted chambers beyond time?",
+    "type": "prompt",
+    "regions": {
+      "us": true,
+      "uk": true,
+      "ca": true,
+      "au": true,
+      "intl": true
+    },
+    "pick": 1
+  },
+  {
+    "text": "Your father was a powerful wizard, Harry. Before he died, he left you something very precious: ___.",
+    "type": "prompt",
+    "regions": {
+      "us": true,
+      "uk": true,
+      "ca": true,
+      "au": true,
+      "intl": true
+    },
+    "pick": 1
+  },
+  {
+    "text": "A CGI dragon.",
+    "type": "response",
+    "regions": {
+      "us": true,
+      "uk": true,
+      "ca": true,
+      "au": true,
+      "intl": true
+    }
+  },
+  {
+    "text": "A dwarf who won't leave you alone until you compare penis sizes.",
+    "type": "response",
+    "regions": {
+      "us": true,
+      "uk": true,
+      "ca": true,
+      "au": true,
+      "intl": true
+    }
+  },
+  {
+    "text": "A gay sorcerer who turns everyone gay.",
+    "type": "response",
+    "regions": {
+      "us": true,
+      "uk": true,
+      "ca": true,
+      "au": true,
+      "intl": true
+    }
+  },
+  {
+    "text": "A ghoul.",
+    "type": "response",
+    "regions": {
+      "us": true,
+      "uk": true,
+      "ca": true,
+      "au": true,
+      "intl": true
+    }
+  },
+  {
+    "text": "A gnome who won’t leave you alone until you compare penis sizes.",
+    "type": "response",
+    "regions": {
+      "us": true,
+      "uk": true,
+      "ca": true,
+      "au": true,
+      "intl": true
+    }
+  },
+  {
+    "text": "A Hitachi Magic Wand.",
+    "type": "response",
+    "regions": {
+      "us": true,
+      "uk": true,
+      "ca": true,
+      "au": true,
+      "intl": true
+    }
+  },
+  {
+    "text": "A hot swamp full of horny witches.",
+    "type": "response",
+    "regions": {
+      "us": true,
+      "uk": true,
+      "ca": true,
+      "au": true,
+      "intl": true
+    }
+  },
+  {
+    "text": "A magical kingdom with dragons and elves and no black people.",
+    "type": "response",
+    "regions": {
+      "us": true,
+      "uk": true,
+      "ca": true,
+      "au": true,
+      "intl": true
+    }
+  },
+  {
+    "text": "A mysterious, floating orb.",
+    "type": "response",
+    "regions": {
+      "us": true,
+      "uk": true,
+      "ca": true,
+      "au": true,
+      "intl": true
+    }
+  },
+  {
+    "text": "A weed elemental who gets everyone high.",
+    "type": "response",
+    "regions": {
+      "us": true,
+      "uk": true,
+      "ca": true,
+      "au": true,
+      "intl": true
+    }
+  },
+  {
+    "text": "Accidentally conjuring a legless horse that can't stop ejaculating.",
+    "type": "response",
+    "regions": {
+      "us": true,
+      "uk": true,
+      "ca": true,
+      "au": true,
+      "intl": true
+    }
+  },
+  {
+    "text": "Astral-projecting into the Goat Realm.",
+    "type": "response",
+    "regions": {
+      "us": true,
+      "uk": true,
+      "ca": true,
+      "au": true,
+      "intl": true
+    }
+  },
+  {
+    "text": "Bathing naked in a moonlit grove.",
+    "type": "response",
+    "regions": {
+      "us": true,
+      "uk": true,
+      "ca": true,
+      "au": true,
+      "intl": true
+    }
+  },
+  {
+    "text": "Dinosaurs who wear armor and you ride them and they kick ass.",
+    "type": "response",
+    "regions": {
+      "us": true,
+      "uk": true,
+      "ca": true,
+      "au": true,
+      "intl": true
+    }
+  },
+  {
+    "text": "Eternal darkness.",
+    "type": "response",
+    "regions": {
+      "us": true,
+      "uk": true,
+      "ca": true,
+      "au": true,
+      "intl": true
+    }
+  },
+  {
+    "text": "Foraging for berries in yonder wood.",
+    "type": "response",
+    "regions": {
+      "us": true,
+      "uk": true,
+      "ca": true,
+      "au": true,
+      "intl": true
+    }
+  },
+  {
+    "text": "Freaky, pan-dimensional sex with a demigod.",
+    "type": "response",
+    "regions": {
+      "us": true,
+      "uk": true,
+      "ca": true,
+      "au": true,
+      "intl": true
+    }
+  },
+  {
+    "text": "Gender equality.",
+    "type": "response",
+    "regions": {
+      "us": true,
+      "uk": true,
+      "ca": true,
+      "au": true,
+      "intl": true
+    }
+  },
+  {
+    "text": "Going on an epic adventure and learning a valuable lesson about friendship.",
+    "type": "response",
+    "regions": {
+      "us": true,
+      "uk": true,
+      "ca": true,
+      "au": true,
+      "intl": true
+    }
+  },
+  {
+    "text": "Handcuffing a wizard to a radiator and dousing him with kerosene.",
+    "type": "response",
+    "regions": {
+      "us": true,
+      "uk": true,
+      "ca": true,
+      "au": true,
+      "intl": true
+    }
+  },
+  {
+    "text": "Hodor.",
+    "type": "response",
+    "regions": {
+      "us": true,
+      "uk": true,
+      "ca": true,
+      "au": true,
+      "intl": true
+    }
+  },
+  {
+    "text": "How hot Orlando Bloom was in Lord of the Rings.",
+    "type": "response",
+    "regions": {
+      "us": true,
+      "uk": true,
+      "ca": true,
+      "au": true,
+      "intl": true
+    }
+  },
+  {
+    "text": "Kneeing a wizard in the balls.",
+    "type": "response",
+    "regions": {
+      "us": true,
+      "uk": true,
+      "ca": true,
+      "au": true,
+      "intl": true
+    }
+  },
+  {
+    "text": "Make-believe stories for autistic white men.",
+    "type": "response",
+    "regions": {
+      "us": true,
+      "uk": true,
+      "ca": true,
+      "au": true,
+      "intl": true
+    }
+  },
+  {
+    "text": "Reading The Hobbit under the covers while mom and dad scream at each other downstairs.",
+    "type": "response",
+    "regions": {
+      "us": true,
+      "uk": true,
+      "ca": true,
+      "au": true,
+      "intl": true
+    }
+  },
+  {
+    "text": "Shitting in a wizard's spell book and jizzing in his hat.",
+    "type": "response",
+    "regions": {
+      "us": true,
+      "uk": true,
+      "ca": true,
+      "au": true,
+      "intl": true
+    }
+  },
+  {
+    "text": "Shooting a wizard with a gun.",
+    "type": "response",
+    "regions": {
+      "us": true,
+      "uk": true,
+      "ca": true,
+      "au": true,
+      "intl": true
+    }
+  },
+  {
+    "text": "The all-seeing Eye of Sauron.",
+    "type": "response",
+    "regions": {
+      "us": true,
+      "uk": true,
+      "ca": true,
+      "au": true,
+      "intl": true
+    }
+  },
+  {
+    "text": "The bond of brotherhood forged in battle, unbreakable and eternal.",
+    "type": "response",
+    "regions": {
+      "us": true,
+      "uk": true,
+      "ca": true,
+      "au": true,
+      "intl": true
+    }
+  },
+  {
+    "text": "The card Neil Gaiman wrote: \"Three elves at a time.\"",
+    "type": "response",
+    "regions": {
+      "us": true,
+      "uk": true,
+      "ca": true,
+      "au": true,
+      "intl": true
+    }
+  },
+  {
+    "text": "Ticketmaster, LORD of Tickets, ENFORCER of Surcharges, DENIER of Refunds!",
+    "type": "response",
+    "regions": {
+      "us": true,
+      "uk": true,
+      "ca": true,
+      "au": true,
+      "intl": true
+    }
+  },
+  {
+    "text": "True love's kiss.",
+    "type": "response",
+    "regions": {
+      "us": true,
+      "uk": true,
+      "ca": true,
+      "au": true,
+      "intl": true
+    }
+  }
+]
