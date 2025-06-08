@@ -36,7 +36,7 @@
     "pick": 2
   },
   {
-    "text": "In line with our predictions, we find a robust correlation between ______ and ______ (p< .05).",
+    "text": "In line with our predictions, we find a robust correlation between ______ and ______.",
     "type": "prompt",
     "regions": {
       "us": true,

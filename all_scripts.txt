@@ -1,0 +1,1834 @@
+# .\setup.py
+
+# setup.py
+from setuptools import setup, find_packages
+
+setup(
+    name="cards_against_bubba",
+    version="0.1",
+    package_dir={"": "src"},
+    packages=find_packages(where="src"),
+    install_requires=[
+        "py-cord>=2.0.0",
+        # ...other deps
+    ],
+)
+
+
+# .\src\cards_engine\card.py
+
+from dataclasses import dataclass
+from typing import Literal, Mapping, Optional, List
+import re
+
+@dataclass(frozen=True)
+class Card:
+    text: str
+    card_type: Literal["prompt", "response"]
+    pick: int
+    regions: Mapping[str, bool]
+    expansion: Optional[str] = None
+
+    @property
+    def num_blanks(self) -> int:
+        """Returns the number of blank slots (underscores) in the text."""
+        return len(re.findall(r'_{3,}', self.text))  # matches ___, ____, etc.
+
+    @property
+    def has_blanks(self) -> bool:
+        """True if the card text has at least one blank."""
+        return self.num_blanks > 0
+
+    import re
+
+    def format_prompt(self, responses: List[str]) -> str:
+        def _strip_single_terminal_punct(text):
+            if not text:
+                return text
+            if len(text) > 2 and text[-3:] == "...":
+                return text
+            if len(text) > 1 and text[-2:] in ("?!", "!?"):
+                return text
+            if text[-1] in ".!?":
+                if len(text) == 1 or text[-2] not in ".!?":
+                    return text[:-1]
+            return text
+
+        n = self.num_blanks
+        out = self.text
+
+        if n > 0:
+            def replacer(match):
+                idx = replacer.idx
+                replacer.idx += 1
+                if idx < len(responses):
+                    resp = _strip_single_terminal_punct(responses[idx])
+                    # If the previous char is not a terminal punctuation,
+                    # and resp starts with "The"/"A"/"An", lowercase it
+                    start = match.start()
+                    prev_char = self.text[start-1] if start > 0 else ""
+                    if prev_char not in ".!?" and re.match(r"^(The|A|An)\b", resp):
+                        resp = resp[0].lower() + resp[1:]
+                    return f"{resp}"
+                return match.group(0)
+            replacer.idx = 0
+            out = re.sub(r'_{3,}', replacer, out)
+            return out
+        else:
+            resp_text = " ".join(f"{resp}" for resp in responses)
+            if resp_text:
+                out = f"{out} {resp_text}"
+            return out
+
+
+# .\src\cards_engine\card_repository.py
+
+import json, os
+from glob import glob
+from collections import defaultdict
+from typing import List, Optional, Dict
+from .card import Card
+
+class CardRepository:
+    def __init__(self, path_pattern: Optional[str] = None):
+        self._path_pattern = path_pattern or self._default_path_pattern()
+        self._cards: List[Card] = self._load_all(self._path_pattern)
+
+    def _default_path_pattern(self) -> str:
+        here = os.path.dirname(__file__)
+        project_root = os.path.abspath(os.path.join(here, "..", ".."))
+        data_dir = os.path.join(project_root, "data")
+        return os.path.join(data_dir, "*.json")
+
+    def _load_all(self, path_pattern: str) -> List[Card]:
+        cards: List[Card] = []
+        files = sorted(glob(path_pattern))
+        print(f"[CardRepo] Found {len(files)} JSON files matching {path_pattern}:")
+        for fn in files:
+            expansion = os.path.splitext(os.path.basename(fn))[0]
+            if expansion.endswith("_pack"):
+                expansion = expansion.removesuffix("_pack")
+
+            print(f"  → Loading file: {fn!r}  as expansion '{expansion}'")
+            with open(fn, encoding="utf-8") as f:
+                raw_cards = json.load(f)
+            print(f"     contains {len(raw_cards)} raw cards")
+            for raw in raw_cards:
+                cards.append(Card(
+                    text      = raw["text"],
+                    card_type = raw["type"],
+                    pick      = raw.get("pick", 1),
+                    regions   = raw["regions"],
+                    expansion = expansion
+                ))
+        print(f"[CardRepo] Total cards loaded: {len(cards)}\n")
+        return cards
+
+    def load(self) -> List[Card]:
+        return list(self._cards)  # return a copy if you like
+
+    def filter(
+        self,
+        card_type:  Optional[str]        = None,
+        regions:    Optional[Dict[str,bool]] = None,
+        expansions: Optional[List[str]]   = None
+    ) -> List[Card]:
+        cards = self._cards
+        if card_type:
+            cards = [c for c in cards if c.card_type == card_type]
+        if regions:
+            cards = [
+                c for c in cards
+                if any(regions.get(r, False) and c.regions.get(r, False)
+                       for r in regions)
+            ]
+        if expansions:
+            cards = [c for c in cards if c.expansion in expansions]
+        return cards.copy()
+
+    def print_stats(self) -> None:
+        per_file: Dict[str,int] = defaultdict(int)
+        region_totals: Dict[str,int] = defaultdict(int)
+
+        for c in self._cards:
+            per_file[c.expansion] += 1
+            for region, allowed in c.regions.items():
+                if allowed:
+                    region_totals[region] += 1
+
+        for exp, cnt in per_file.items():
+            print(f"Loaded {cnt} cards from expansion '{exp}'")
+        print("\nTotals by region:")
+        for region, cnt in region_totals.items():
+            print(f"  {region}: {cnt}")
+        print(f"\nGrand total: {len(self._cards)} cards\n")
+
+    def reload(self, path_pattern: Optional[str] = None) -> None:
+        """Reload cards from disk. Uses the original or provided path pattern."""
+        if path_pattern is not None:
+            self._path_pattern = path_pattern
+        else:
+            if not hasattr(self, "_path_pattern") or self._path_pattern is None:
+                self._path_pattern = self._default_path_pattern()
+        self._cards = self._load_all(self._path_pattern)
+
+    def available_expansions(self) -> List[str]:
+        return sorted({c.expansion for c in self._cards})
+
+    def available_regions(self) -> List[str]:
+        if not self._cards:
+            return []
+        return list(self._cards[0].regions.keys())
+
+
+# .\src\cards_engine\game.py
+
+# src/cards_engine/game.py
+
+import inspect
+from typing    import Callable, List, Union, Awaitable
+from .game_state    import GameState
+from .game_phases   import Phase
+from .card_repository import CardRepository
+from .game_config   import GameConfig
+from .player        import Player
+from .game_engine   import GameEngine
+
+PhaseListener = Union[
+    Callable[['Game', Phase, Phase], None],
+    Callable[['Game', Phase, Phase], Awaitable[None]]
+]
+
+class Game:
+    def __init__(self,
+                 players:    List[Player],
+                 config:     GameConfig,
+                 repository: CardRepository,
+                 channel_id: int = None) -> None:
+        self.players = players
+        self.config = config
+        self.repo   = repository
+        self.channel_id = channel_id
+        self.engine = GameEngine()
+        self._phase_listeners: List[PhaseListener] = []
+        self.state = None
+
+    def add_phase_listener(self, fn: PhaseListener) -> None:
+        self._phase_listeners.append(fn)
+
+    async def _set_phase(self, new_phase: Phase) -> None:
+        print(f"Game._set_phase: {new_phase}, id(self)={id(self)}")
+        old = self.state.phase
+        if old is new_phase:
+            return
+        self.state.phase = new_phase
+        for fn in self._phase_listeners:
+            print(f"Calling phase listener {fn} for Game id={id(self)}")
+            result = fn(self, old, new_phase)
+            if inspect.isawaitable(result):
+                await result
+
+    async def start(self) -> None:
+        black = self.repo.filter(
+            card_type   = "prompt",
+            regions     = self.config.regions,
+            expansions  = self.config.expansions)
+        black = [c for c in black if self.config.min_blanks <= c.pick <= self.config.max_blanks]
+
+        white = self.repo.filter(
+            card_type   = "response",
+            regions     = self.config.regions,
+            expansions  = self.config.expansions)
+
+        self.state = GameState(
+            players= self.players,
+            hand_size= self.config.hand_size,
+            black_deck= black,
+            white_deck= white
+        )
+
+        if self.config.draft_mode:
+            next_phase = self.engine.draft_deal(self.state, self.state.hand_size)
+        else:
+            next_phase = self.engine.start_game(self.state)
+        await self._set_phase(next_phase)
+
+    async def submit(self, player_id: str, card_indices: List[int]) -> None:
+        if not self.state:
+            raise RuntimeError("Game not started yet.")
+        
+        player = self.state.player_by_id(player_id)
+        cards  = [player.hand[i] for i in card_indices]
+        all_in = self.engine.submit_cards(self.state, player_id, cards)
+        if all_in:
+            await self._set_phase(Phase.JUDGING)
+
+    async def judge(self, winner_id: str) -> None:
+        print("Game.judge")
+        if not self.state:
+            raise RuntimeError("Game not started yet.")
+
+        next_phase = self.engine.judge_pick(self.state, winner_id)
+        await self._set_phase(next_phase)
+
+    async def draft_pick(self, player_id: str, pick_index: int) -> None:
+        if not self.state:
+            raise RuntimeError("Game not started")
+        if self.state.phase is not Phase.DRAFT_PICKING:
+            raise RuntimeError(f"Not in draft phase: {self.state.phase}")
+        next_phase = self.engine.draft_pick(self.state, player_id, pick_index)
+        await self._set_phase(next_phase)
+
+# .\src\cards_engine\game_config.py
+
+# game_config.py
+from dataclasses import dataclass, field
+from typing import List, Dict
+
+@dataclass(frozen=True)
+class GameConfig:
+    expansions: List[str]               = field(default_factory=list)
+    regions:    Dict[str,bool]          = field(default_factory=lambda: {
+        "us": True, "uk": True, "ca": True, "au": True, "intl": True
+    })
+    draft_mode: bool                    = True
+    hand_size: int                      = 6
+    min_blanks: int                     = 1
+    max_blanks: int                     = 3
+
+# .\src\cards_engine\game_engine.py
+
+import random
+from typing import List
+from .game_state    import GameState
+from .player        import Player
+from .card          import Card
+from .game_phases   import Phase
+
+class GameEngine:
+    def start_game(self, state: GameState) -> Phase:
+        """Standard deal & first prompt."""
+        random.shuffle(state.black_deck)
+        random.shuffle(state.white_deck)
+
+        total_needed = len(state.players) * state.hand_size
+        if len(state.white_deck) < total_needed:
+            raise ValueError(
+                f"Not enough white cards for classic deal: need {total_needed}, got {len(state.white_deck)}"
+            )
+
+        state.submissions.clear()
+        for p in state.players:
+            p.hand = [state.white_deck.pop() for _ in range(state.hand_size)]
+            p.score = 0
+
+        self.draw_prompt(state)
+        return Phase.SUBMISSIONS
+
+
+    def draw_prompt(self, state: GameState) -> None:
+        state.submissions.clear()
+        state.current_prompt = state.black_deck.pop()
+
+    def submit_cards(self, state: GameState, player_id: str, cards: List[Card]) -> bool:
+        state.phase_check(Phase.SUBMISSIONS)
+
+        # find the player
+        player = next(p for p in state.players if p.id == player_id)
+        # judge guard
+        if state.players[state.judge_index] is player:
+            raise RuntimeError("Judge cannot submit cards.")
+
+        # pick-count guard
+        expected = state.current_prompt.pick
+        if len(cards) != expected:
+            raise ValueError(f"Expected {expected} cards, got {len(cards)}.")
+
+        # remove from hand
+        for c in cards:
+            player.hand.remove(c)
+
+        # record submission
+        state.submissions[player_id] = cards
+
+        all_in = self._all_non_judges_submitted(state)
+        if all_in:
+            print(f"[DEBUG] Player {player_id} submitted {len(cards)} cards.")
+        else:
+            print(f"[DEBUG] Player {player_id} has submitted {len(cards)} cards, waiting for others...")
+        return all_in
+            
+
+    def judge_pick(self, state: GameState, winner_id: str) -> Phase:
+        state.last_round_selected_id = winner_id
+        state.last_round_selected_cards = state.submissions.get(winner_id, [])
+        state.phase_check(Phase.JUDGING)
+        winner = self.find_player(state, winner_id)
+        winner.score += 1
+
+        self._replenish_hands(state)
+        state.judge_index = (state.judge_index + 1) % len(state.players)
+        self.draw_prompt(state)
+        return Phase.SUBMISSIONS
+    
+    def draft_deal(self, state: GameState, pack_size: int) -> Phase:
+        """Deal each player a pack of `pack_size` from white_deck, init kept‐piles, and enter draft."""
+        random.shuffle(state.white_deck)
+        total_needed = len(state.players) * pack_size
+        if len(state.white_deck) < total_needed:
+            raise ValueError(
+                f"Not enough white cards for draft: need {total_needed}, got {len(state.white_deck)}"
+            )
+
+        # zero out any old draft data
+        state.draft_queues     = {}
+        state.draft_kept       = {}
+        state.draft_round_picks = 0   # counter for picks this round
+
+        for p in state.players:
+            state.draft_queues[p.id] = [state.white_deck.pop() for _ in range(pack_size)]
+            state.draft_kept[p.id]   = []
+
+        return Phase.DRAFT_PICKING
+
+    def draft_pick(self, state: GameState, player_id: str, pick_index: int):
+        """Player picks one card from their queue.  Once *all* players have picked this round,
+           rotate the *remainders* to the next seat in one batch."""
+        state.phase_check(Phase.DRAFT_PICKING)
+
+        # 1) Remove chosen card & stash in kept‐pile
+        queue = state.draft_queues[player_id]
+        picked = queue.pop(pick_index)
+        state.draft_kept[player_id].append(picked)
+
+        # 2) Count this pick
+        state.draft_round_picks += 1
+
+        # 3) If every player has now picked once, **rotate** the leftover queues:
+        if state.draft_round_picks >= len(state.players):
+            old_qs = state.draft_queues
+            new_qs = {}
+            n      = len(state.players)
+            for i, p in enumerate(state.players):
+                # p gets the leftovers from the previous player
+                prev = state.players[(i - 1) % n]
+                new_qs[p.id] = old_qs[prev.id]
+            state.draft_queues = new_qs
+            state.draft_round_picks = 0
+
+        # 4) Have we now kept `hand_size` each?  If so, finish draft:
+        if all(len(state.draft_kept[p.id]) >= state.hand_size for p in state.players):
+            # move each kept‐pile into that player’s hand
+            for p in state.players:
+                p.hand.extend(state.draft_kept[p.id])
+            self.draw_prompt(state)
+            return Phase.SUBMISSIONS
+        return Phase.DRAFT_PICKING
+
+    # ─── Helpers ────────────────────────────────────────────────
+
+    def find_player(self, state: GameState, player_id: str) -> Player:
+        return next(p for p in state.players if p.id == player_id)
+
+    def _all_non_judges_submitted(self, state: GameState) -> bool:
+        judge = state.players[state.judge_index]
+        for p in state.players:
+            name = p.name if p.name else p.id
+            if p is judge:
+                print(f"[DEBUG] Player {name} is the judge.")
+                continue
+            if p.id not in state.submissions:
+                print(f"[DEBUG] Player {name} has not submitted.")
+                return False
+        print("[DEBUG] All non-judges have submitted.")
+        return True
+
+    def _is_judge(self, state: GameState, player: Player) -> bool:
+        return state.players[state.judge_index] is player
+
+    def _replenish_hands(self, state: GameState) -> None:
+        for p in state.players:
+            while len(p.hand) < state.hand_size:
+                p.hand.append(state.white_deck.pop())
+
+# .\src\cards_engine\game_phases.py
+
+from enum import Enum
+
+class Phase(str, Enum):
+    WAITING       = "waiting_for_players"
+    DRAFT_PICKING = "draft_picking"
+    SUBMISSIONS   = "submissions"
+    JUDGING       = "judging"
+
+# .\src\cards_engine\game_state.py
+
+from dataclasses import dataclass, field
+from enum import Enum
+from typing import List, Optional, Dict
+from .card import Card
+from .player import Player
+from .game_phases import Phase
+
+@dataclass
+class GameState:
+    players:                List[Player]
+    hand_size:              int = 7
+    draft_queues:           Dict[str, List[Card]] = field(default_factory=dict)
+    draft_kept:             Dict[str, List[Card]] = field(default_factory=dict)
+    draft_pass_index:       int = 0
+    draft_direction:        int = +1
+    draft_round_picks:      int = 0
+    black_deck:             List[Card] = field(default_factory=list)
+    white_deck:             List[Card] = field(default_factory=list)
+    current_prompt:         Optional[Card] = None
+    judge_index:            int = 0
+    phase:                  Phase = Phase.WAITING
+    last_round_selected_id: Optional[str] = None
+    last_round_selected_cards: List[Card] = field(default_factory=list)
+
+    submissions:            Dict[str, List[Card]] = field(default_factory=dict)
+
+    @property
+    def current_judge(self) -> Player:
+        return self.players[self.judge_index]
+
+    def phase_check(self, expected_phase: Phase):
+        if self.phase != expected_phase:
+            raise ValueError(f"Invalid phase: expected {expected_phase}, got {self.phase}")
+        
+    def player_by_id(self, player_id: str) -> Optional[Player]:
+        for player in self.players:
+            if player.id == player_id:
+                return player
+        return None
+
+    def reset(self):
+        self.current_prompt = None
+        self.judge_index = 0
+        self.phase = Phase.WAITING
+        for player in self.players:
+            player.hand.clear()
+            player.score = 0
+        self.black_deck.clear()
+        self.white_deck.clear()
+        self.submissions.clear()
+
+
+# .\src\cards_engine\player.py
+
+from dataclasses import dataclass, field
+from typing import List, Optional
+from .card import Card
+
+@dataclass
+class Player:
+    id: str
+    name: str
+    hand: List[Card] = field(default_factory=list)
+    score: int = 0
+
+# .\src\cards_engine\__init__.py
+
+
+
+# .\src\discord_bot\bot.py
+
+from discord.ext import commands
+from discord_bot.config import TOKEN, intents
+from discord_bot.services.game_manager import set_bot
+
+bot = commands.Bot(command_prefix="!", intents=intents)
+
+@bot.event
+async def on_ready():
+    user_id = bot.user.id if bot.user else "Unknown"
+    print(f"Bot is ready. User ID: {user_id}")
+
+if __name__ == "__main__":
+    for cog in ["discord_bot.cogs.game_cog"]:
+        bot.load_extension(cog)
+    set_bot(bot)
+    bot.run(TOKEN)
+
+# .\src\discord_bot\config.py
+
+import os
+from discord import Intents
+
+TOKEN = os.getenv("CAB_BOT_TOKEN")
+intents = Intents.default()
+
+# .\src\discord_bot\__init__.py
+
+
+
+# .\src\discord_bot\cogs\game_cog.py
+
+import discord
+from discord.ext import commands
+from discord import Option
+from discord_bot.services.game_manager  import create_lobby, get_game
+from discord_bot.views.setup_view       import SetupView
+from discord_bot.views.join_view        import JoinView
+from discord_bot.views.draft_view       import DraftView
+from discord_bot.views.play_view        import PlayView
+from discord_bot.views.judge_view       import JudgeView
+from cards_engine.game_phases           import Phase
+from cards_engine.player                import Player
+from cards_engine.game                  import Game
+from discord_bot.views.judge_button_view import JudgeButtonView
+
+class GameCog(commands.Cog):
+    def __init__(self, bot):
+        self.bot = bot
+
+    @commands.slash_command(
+            name="start", 
+            description="Create and configure a new game of Cards Against Bubba",
+            guild_ids=[1075249749357252680, 1167164629844234270]
+            )
+    async def start(self, ctx: discord.ApplicationContext):
+        existing = get_game(ctx.channel_id)
+        if existing:
+            await ctx.respond(
+                "❌ A game is already in progress in this channel.",
+                ephemeral=True
+            )
+            return None
+
+        lobby = create_lobby(
+            channel_id=ctx.channel_id,
+            host_id=ctx.author.id,
+            host_name=ctx.author.display_name
+        )
+
+        player_host = Player(id=str(ctx.author.id), name=ctx.author.display_name)
+        lobby.players.append(player_host)
+
+        view_join = JoinView(lobby)
+        join_message = await ctx.channel.send(
+            f"👋 {ctx.author.display_name} started a new game of Cards Against Bubba! Join with `/join` or by clicking the button!",
+            view=view_join,
+        )
+        lobby.join_message_id = join_message.id
+
+        view_setup = SetupView(ctx.channel_id, bot=self.bot)
+        await ctx.respond(
+            "👋 Host panel: Select packs and regions, then set hand size and draft mode, and ▶️ Launch!",
+            view=view_setup,
+            ephemeral=True
+        )
+
+    @commands.slash_command(
+            name="draft", 
+            description="Pick from your current draft pack",
+            guild_ids=[1075249749357252680, 1167164629844234270]
+            )
+    async def draft(self, ctx: discord.ApplicationContext):
+        game = get_game(ctx.channel_id)
+        if not game or game.state.phase is not Phase.DRAFT_PICKING:
+            return await ctx.respond("No draft in progress.", ephemeral=True)
+
+        # send (or re‐use) one ephemeral message per player
+        view = DraftView(ctx.channel_id, str(ctx.author.id))
+        await ctx.respond(
+            "Your draft pack, pick one card:",
+            view=view,
+            ephemeral=True
+        )
+
+    @commands.slash_command(
+        name="play",
+        description="Select cards to play as a response to the current prompt",
+        guild_ids=[1075249749357252680, 1167164629844234270]
+    )
+    async def play(self, ctx: discord.ApplicationContext):
+        game = get_game(ctx.channel_id)
+        if not game or game.state.phase != Phase.SUBMISSIONS:
+            return await ctx.respond("No active round to play cards.", ephemeral=True)
+
+        player = game.state.player_by_id(str(ctx.author.id))
+        if not player:
+            return await ctx.respond("You are NOT in this game!", ephemeral=True)
+        view = PlayView(ctx.channel_id, str(ctx.author.id), self.bot)
+        if view.pick_count == 1:
+            msg = "Select a response to play for this prompt."
+        else:
+            msg = "Select a response to play for the first blank of this prompt."
+        await ctx.respond(
+            msg,
+            view=view,
+            ephemeral=True
+        )
+
+    @commands.slash_command(
+        name="judge",
+        description="Select the best response as the judge",
+        guild_ids=[1075249749357252680, 1167164629844234270]
+    )
+    async def judge(self, ctx: discord.ApplicationContext):
+        game = get_game(ctx.channel_id)
+        if not game or game.state.phase != Phase.JUDGING:
+            return await ctx.respond("No active round to judge responses.", ephemeral=True)
+
+        player = game.state.player_by_id(str(ctx.author.id))
+        if not player or player.id != game.state.current_judge.id:
+            return await ctx.respond("You are NOT the judge this round!", ephemeral=True)
+
+        async def on_judge_pick(player_id: str):
+            await self.on_judge_pick(ctx.channel_id, player_id)
+
+        view = JudgeView(game, judge_id=game.state.current_judge.id, on_judge_pick=on_judge_pick)
+        await ctx.respond(
+            "Select the best response from the submissions.:",
+            view=view,
+            ephemeral=True
+        )
+
+    async def on_judge_pick(self, channel_id: int, player_id: str):
+        print("GameCog.on_judge_pick")
+        game = get_game(channel_id)
+        await game.judge(player_id)
+
+    async def on_button_view_judge(self, interaction: discord.Interaction, game: Game):
+        """Create a view for the judge button."""
+        if str(interaction.user.id) != str(game.state.current_judge.id):
+            await interaction.response.send_message("Only the judge can judge this round!", ephemeral=True)
+            return
+        # Build the actual judge view
+        view = JudgeView(game, judge_id=game.state.current_judge.id, on_judge_pick=...)  # etc.
+        await interaction.response.send_message(
+            "Select the best response:",
+            view=view,
+            ephemeral=True
+        )
+
+def setup(bot):
+    bot.add_cog(GameCog(bot))
+
+
+# .\src\discord_bot\services\game_flow.py
+
+import asyncio
+import random
+from discord_bot.views.judge_button_view import JudgeButtonView
+from cards_engine.game_phases import Phase
+from discord_bot.views.play_button_view import PlayButtonView
+
+async def reveal_submissions(channel, game, on_judge_button, delay=3.0):
+    """Reveal all submissions anonymously to the main channel, one at a time."""
+    submissions = list(game.state.submissions.items())
+    prompt = game.state.current_prompt
+
+    # Shuffle for fairness
+    random.shuffle(submissions)
+
+    await channel.send("✅ All responses are in! Revealing submissions anonymously...")
+    await asyncio.sleep(delay)
+
+    for idx, (player_id, cards) in enumerate(submissions):
+        responses = [c.text for c in cards]
+        formatted = prompt.format_prompt(responses)
+        await channel.send(f"**#{idx+1}:** {formatted}")
+        await asyncio.sleep(delay)
+
+    judge = game.state.current_judge
+    view_judge_button = JudgeButtonView(game, on_judge_button)
+    await channel.send(
+        f"All submissions revealed! <@{judge.id}>, please select the best response using `/judge` command!\n",
+        view=view_judge_button
+    )
+
+async def announce_round_start(channel, game):
+    judge_current = getattr(game.state, "current_judge", None)
+    judge_current_name = judge_current.name if judge_current else "Unknown"
+    prompt_card = getattr(game.state, "current_prompt", None)
+    prompt_text = prompt_card.text if prompt_card else "No prompt selected."
+
+    if game.state.phase == Phase.DRAFT_PICKING:
+        await channel.send(
+            "🏀 **Draft mode** is enabled. "
+            "Please type **/draft** to begin selecting your cards!"
+        )
+    else:
+        view_play_button = PlayButtonView(game, bot=game.bot)
+        await channel.send(
+            f"\n\nThe judge is currently **{judge_current_name}**.\n"
+            f"Your prompt is:\n**{prompt_text}**",
+            view=view_play_button
+        )
+
+
+# .\src\discord_bot\services\game_manager.py
+
+import random
+import asyncio
+from typing                         import Dict
+from cards_engine.game              import Game
+from cards_engine.card_repository   import CardRepository
+from .lobby                         import Lobby
+from cards_engine.game_phases       import Phase
+from cards_engine.player            import Player
+from .game_flow                     import reveal_submissions, announce_round_start
+from discord_bot.views.play_button_view import PlayButtonView
+from discord_bot.views.judge_button_view import JudgeButtonView
+
+_repo = CardRepository()
+_lobbies: Dict[int, Lobby] = {}   # channel_id → Lobby
+_games:   Dict[int, Game]  = {}   # channel_id → running Game
+_bot = None
+
+def set_bot(bot) -> None:
+    """Sets the global bot instance."""
+    global _bot
+    _bot = bot
+
+def get_repository() -> CardRepository:
+    """Returns the global card repository."""
+    return _repo
+
+def create_lobby(channel_id: int, host_id: int, host_name: str) -> Lobby:
+    host_player = Player(id=str(host_id), name=host_name)
+    lobby = Lobby(host=host_player)
+    _lobbies[channel_id] = lobby
+    return lobby
+
+def get_lobby(channel_id: int) -> Lobby | None:
+    return _lobbies.get(channel_id)
+
+def remove_lobby(channel_id: int) -> None:
+    _lobbies.pop(channel_id, None)
+
+async def start_game(channel_id: int) -> Game:
+    lobby = _lobbies.pop(channel_id)
+    random.shuffle(lobby.players)
+    real = Game(
+        players    = lobby.players,
+        config     = lobby.config,
+        repository = _repo,
+        channel_id = channel_id
+    )
+    print(f"start_game: new Game id={id(real)}")
+    real.add_phase_listener(on_phase_change)
+    await real.start()
+    _games[channel_id] = real
+    return real
+
+
+async def on_phase_change(game: Game, old_phase: Phase, new_phase: Phase):
+    print(f"[GameManager] Phase changed  ({old_phase} -> {new_phase}) for game {game.channel_id}")
+    game_channel = _bot.get_channel(game.channel_id)
+    if new_phase == Phase.JUDGING:
+        await reveal_submissions(game_channel, game)
+        await game_channel.send(
+            "🔍 All responses are in! The judge is now reviewing the submissions. "
+            "Please wait for the judge to select the best response."
+        )
+        return
+
+    elif new_phase == Phase.SUBMISSIONS:
+        winner_id = getattr(game.state, "last_round_selected_id", None)
+        winner_cards = getattr(game.state, "last_round_selected_cards", [])
+        if winner_id:
+            winner = game.state.player_by_id(winner_id)
+            winner_name = winner.name if winner else f"<@{winner_id}>"
+            winner_score = winner.score if winner else "?"
+            cards_str = "\n".join(f"> **{c.text}**" for c in winner_cards)
+            await game_channel.send(
+                f"🏆 **{winner_name}** was selected as the winner!\n"
+                f"Winning card(s):\n{cards_str}\n"
+                f"**{winner_name}** now has **{winner_score}** point{'s' if winner_score != 1 else ''}!"
+            )
+        
+        await announce_round_start(game_channel, game)
+        
+
+    await asyncio.sleep(2)
+
+def get_game(channel_id: int) -> Game | None:
+    game = _games.get(channel_id)
+    print(f"get_game: Game id={id(game) if game else None}")
+    return game
+
+def remove_game(channel_id: int) -> None:
+    _games.pop(channel_id, None)
+
+
+# .\src\discord_bot\services\lobby.py
+
+from dataclasses import dataclass, field
+from typing import List
+from cards_engine.player import Player
+from cards_engine.game_config import GameConfig
+
+@dataclass
+class Lobby:
+    host:    Player
+    players: List[Player] = field(default_factory=list)
+    config:  GameConfig   = field(default_factory=GameConfig)
+    join_message_id: int = 0
+
+# .\src\discord_bot\views\draft_view.py
+
+# discord_bot/views/draft_view.py
+
+from discord import ui, SelectOption, Interaction
+from cards_engine.game_phases import Phase
+from discord_bot.services.game_manager import get_game
+
+class DraftView(ui.View):
+    """A persistent ephemeral view that walks a single player through
+    all of their draft‐packs, editing in place instead of requiring
+    them to retype /draft each round.
+    """
+
+    def __init__(self, channel_id: int, player_id: str):
+        super().__init__(timeout=None)
+        self.channel_id = channel_id
+        self.player_id  = player_id
+        # grab the running game
+        game = get_game(channel_id)
+        if game is None:
+            raise RuntimeError("No game in this channel")
+        self.game = game
+        # draw the first pack
+        self._draw_round()
+
+    def _draw_round(self):
+        """(Re)build the Select so it reflects the current queue for this player."""
+        # clear out any previous components
+        self.clear_items()
+
+        queue = self.game.state.draft_queues[self.player_id]
+        # build one Select with one option per card
+        options = [
+            SelectOption(label=card.text, value=str(idx))
+            for idx, card in enumerate(queue)
+        ]
+        self.add_item(
+            ui.Select(
+                placeholder="Pick one card…",
+                options=options,
+                min_values=1,
+                max_values=1,
+                row=0,
+                callback=self.on_pick
+            )
+        )
+
+    async def on_pick(self, interaction: Interaction):
+        """Handle the user’s pick, advance the engine, then either finish
+        or redraw for the next pass."""
+        pick_index = int(interaction.data["values"][0])
+        # step the draft engine
+        self.game.draft_pick(self.player_id, pick_index)
+
+        # if draft is now over, tear down
+        if self.game.state.phase != Phase.DRAFT_PICKING:
+            await interaction.response.edit_message(
+                content="✅ Draft complete! Check your hand to see what you kept.",
+                view=None
+            )
+            return
+
+        # otherwise re‐draw this same ephemeral message
+        self._draw_round()
+        await interaction.response.edit_message(
+            content="Next pack — pick again:",
+            view=self
+        )
+
+
+# .\src\discord_bot\views\join_view.py
+
+from discord import ui, ButtonStyle, Interaction
+from cards_engine.player import Player
+
+class JoinView(ui.View):
+    def __init__(self, lobby):
+        super().__init__(timeout=None)
+        self.lobby = lobby
+        self.join_button.label = f"Join Game ({len(self.lobby.players)})"
+
+    @ui.button(label="Join Game", style=ButtonStyle.primary, custom_id="join_game")
+    async def join_button(self, button, inter: Interaction):
+        user = inter.user
+        p = Player(id=str(user.id), name=user.nick or user.name)
+        if any(pl.id == p.id for pl in self.lobby.players):
+            return await inter.response.send_message("You’ve already joined!", ephemeral=True)
+
+        self.lobby.players.append(p)
+        button.label = f"Join Game ({len(self.lobby.players)})"
+        await inter.response.edit_message(view=self)
+
+
+# .\src\discord_bot\views\judge_button_view.py
+
+# judge_button_view.py
+
+import discord
+from discord.ui import View
+from discord_bot.views.judge_view import JudgeView
+
+class JudgeButtonView(View):
+    def __init__(self, game, on_judge_button):
+        super().__init__(timeout=None)
+        self.game = game
+        self.on_judge_button = on_judge_button
+
+    @discord.ui.button(label="Judge!", style=discord.ButtonStyle.primary)
+    async def judge_button(self, button, interaction):
+        self.on_judge_button(interaction, self.game)
+
+# .\src\discord_bot\views\judge_view.py
+
+import discord
+from discord.ui import View, Select
+
+class JudgeView(View):
+    def __init__(self, game, judge_id, on_judge_pick):
+        super().__init__(timeout=60)
+        self.game = game
+        self.judge_id = judge_id
+        self.on_judge_pick = on_judge_pick
+
+        # Convert submissions dict to a list for index mapping
+        self.sub_list = list(self.game.state.submissions.items())  # [(player_id, [Card, Card, ...]), ...]
+        
+        # Build options with card texts, not objects or ids
+        options = [
+            discord.SelectOption(
+                label=f"#{i+1}: {', '.join(card.text for card in cards)[:80]}",
+                value=str(i)
+            )
+            for i, (player_id, cards) in enumerate(self.sub_list)
+        ]
+
+        self.select = Select(
+            placeholder="Pick the best response",
+            options=options,
+            min_values=1,
+            max_values=1
+        )
+        self.select.callback = self.on_pick
+        self.add_item(self.select)
+
+    async def on_pick(self, interaction: discord.Interaction):
+        print("JudgeView.on_pick")
+        if str(interaction.user.id) != str(self.judge_id):
+            await interaction.response.send_message("Only the judge can select!", ephemeral=True)
+            return
+
+        picked_idx = int(interaction.data["values"][0])
+        player_id, winner_cards = self.sub_list[picked_idx]
+        await interaction.response.send_message(
+            f"🏆 {interaction.user.mention} has selected <@{player_id}> as the winner with: "
+            f"{', '.join(card.text for card in winner_cards)}",
+            ephemeral=True
+        )
+        await self.on_judge_pick(player_id)
+        self.stop()
+
+# .\src\discord_bot\views\play_button_view.py
+
+# play_button_view.py
+
+import discord
+from discord.ui import View
+from discord_bot.views.play_view import PlayView
+
+class PlayButtonView(View):
+    def __init__(self, game, bot):
+        super().__init__(timeout=None)
+        self.game = game
+        self.bot = bot
+
+    @discord.ui.button(label="Select responses!", style=discord.ButtonStyle.primary)
+    async def play_button(self, button, interaction):
+        player = self.game.state.player_by_id(str(interaction.user.id))
+        if not player:
+            await interaction.response.send_message("You are not in this game!", ephemeral=True)
+            return
+        if self.game.state.current_judge.id == player.id:
+            await interaction.response.send_message("You are the judge this round!", ephemeral=True)
+            return
+        view = PlayView(self.game.channel_id, str(interaction.user.id), self.bot)
+        await interaction.response.send_message(
+            "Select your responses:",
+            view=view,
+            ephemeral=True
+        )
+
+
+# .\src\discord_bot\views\play_view.py
+
+import discord
+import random
+from discord.ui import View, Select, Button
+from cards_engine.game_phases import Phase
+from discord_bot.services.game_manager import get_game
+
+class PlayView(View):
+    def __init__(self, channel_id, player_id, bot, picks=None, pick_index=0):
+        super().__init__(timeout=60)
+        self.channel_id = channel_id
+        self.player_id = player_id
+        self.bot = bot
+        self.picks = picks or []
+        self.pick_index = pick_index
+
+        game = get_game(channel_id)
+        if not game:
+            raise RuntimeError("No game found!")
+
+        self.game = game
+        self.state = game.state
+        self.player = self.state.player_by_id(player_id)
+        self.judge = self.state.current_judge
+
+        if not self.player:
+            raise RuntimeError("Player not found!")
+
+        if self.judge.id == self.player_id:
+            self.add_item(Button(label="You are the judge!", style=discord.ButtonStyle.secondary, disabled=True))
+            self.is_submit_enabled = False
+        else:
+            self.is_submit_enabled = True
+            self.pick_count = self.state.current_prompt.pick if self.state.current_prompt else 1
+            remaining_hand = [(i, c) for i, c in enumerate(self.player.hand) if i not in self.picks]
+            options = [discord.SelectOption(label=c.text[:80], value=str(i)) for i, c in remaining_hand]
+            suffix = ["first", "second", "third", "fourth", "fifth"]
+            which = suffix[self.pick_index] if self.pick_index < len(suffix) else f"#{self.pick_index + 1}"
+            placeholder = (
+                "Select a response for the blank."
+                if self.pick_count == 1 else
+                f"Select a response for the {which} blank."
+            )
+            sel = Select(placeholder=placeholder, options=options, min_values=1, max_values=1)
+            sel.callback = self.on_pick
+            self.add_item(sel)
+
+    async def on_pick(self, interaction: discord.Interaction):
+        if not self.is_submit_enabled:
+            if not interaction.response.is_done():
+                await interaction.response.send_message("You are the judge this round.", ephemeral=True)
+            else:
+                await interaction.followup.send("You are the judge this round.", ephemeral=True)
+            return
+
+        picked_idx = int(interaction.data["values"][0])
+        picks = self.picks + [picked_idx]
+        pick_index = self.pick_index + 1
+        pick_count = self.state.current_prompt.pick if self.state.current_prompt else 1
+
+        if pick_index < pick_count:
+            suffix = ["first", "second", "third", "fourth", "fifth"]
+            which = suffix[pick_index] if pick_index < len(suffix) else f"#{pick_index + 1}"
+            prompt = (
+                "Select a response to play for this prompt."
+                if pick_count == 1 else
+                f"Select a response to play for the {which} blank of this prompt."
+            )
+            # EDIT THE SAME MESSAGE INSTEAD OF SENDING A NEW ONE
+            if not interaction.response.is_done():
+                await interaction.response.edit_message(
+                    content=prompt,
+                    view=PlayView(self.channel_id, self.player_id, self.bot, picks=picks, pick_index=pick_index)
+                )
+            else:
+                await interaction.followup.send(
+                    content=prompt,
+                    view=PlayView(self.channel_id, self.player_id, self.bot, picks=picks, pick_index=pick_index),
+                    ephemeral=True
+                )
+            return
+
+        edit_message = "Your responses have been submitted!"
+        if random.randint(0, 100) < 2:
+            edit_message = "Your responses have been submitted! Bubba is pleased..."
+        await interaction.response.edit_message(
+            content=edit_message,
+            view=None
+        )
+        await self.game.submit(self.player_id, picks)
+        
+
+# .\src\discord_bot\views\setup_view.py
+
+# src/discord_bot/views/setup_view.py
+
+from dataclasses import replace
+import discord
+from discord import Interaction, ButtonStyle, SelectOption
+from discord.ui import View, Button, Select
+from discord_bot.services.game_flow     import announce_round_start
+from cards_engine.game_config           import GameConfig
+from cards_engine.game_phases           import Phase
+from discord_bot.services.game_manager  import get_lobby, get_repository, start_game, remove_lobby
+
+# You can increase this if you add more pages
+MAX_PAGE = 2
+
+MAX_PAGE = 2
+
+class SetupView(View):
+    def __init__(self, channel_id: int, bot, page: int = 1):
+        super().__init__(timeout=300)
+        self.channel_id = channel_id
+        self.bot        = bot
+        self.page       = page
+
+        lobby = get_lobby(channel_id)
+        if lobby is None:
+            raise RuntimeError("No lobby for this channel")
+        if lobby.config is None:
+            lobby.config = GameConfig()
+        self.lobby = lobby
+
+        repository   = get_repository()
+        expansions   = repository.available_expansions()
+        regions      = repository.available_regions()
+        sizes        = list(range(5, 16))
+
+        # Defaults
+        if not self.lobby.config.expansions:
+            self.lobby.config = replace(self.lobby.config, expansions=expansions.copy())
+
+        # ========== SELECT COMPONENTS ==========
+        self.sel_packs = Select(
+            placeholder="Select Expansions",
+            options=[SelectOption(label=e, value=e, default=(e in self.lobby.config.expansions))
+                     for e in expansions],
+            min_values=1, max_values=len(expansions), row=0
+        )
+        self.sel_packs.callback = self.on_select_packs
+
+        self.sel_regions = Select(
+            placeholder="Select Regions",
+            options=[SelectOption(label=r.upper(), value=r, default=self.lobby.config.regions.get(r, False))
+                     for r in regions],
+            min_values=1, max_values=len(regions), row=1
+        )
+        self.sel_regions.callback = self.on_select_regions
+
+        self.sel_size = Select(
+            placeholder="Hand Size",
+            options=[SelectOption(label=f"Hand Size: {n}", value=str(n), default=(n == self.lobby.config.hand_size)) for n in sizes],
+            min_values=1, max_values=1, row=0
+        )
+        self.sel_size.callback = self.on_select_size
+
+        # --- Clearer Labels for Blanks Selectors ---
+        blank_opts_min = [
+            SelectOption(
+                label=f"Min. Blanks Per Prompt: {n}",
+                value=str(n),
+                default=(n == getattr(self.lobby.config, "min_blanks", 1))
+            )
+            for n in range(1, 6)
+        ]
+        self.sel_min_blanks = Select(
+            placeholder="Minimum Blanks Per Prompt",
+            options=blank_opts_min,
+            min_values=1, max_values=1,
+            row=1
+        )
+        self.sel_min_blanks.callback = self.on_select_min_blanks
+
+        blank_opts_max = [
+            SelectOption(
+                label=f"Max. Blanks Per Prompt: {n}",
+                value=str(n),
+                default=(n == getattr(self.lobby.config, "max_blanks", 3))
+            )
+            for n in range(1, 6)
+        ]
+        self.sel_max_blanks = Select(
+            placeholder="Maximum Blanks Per Prompt",
+            options=blank_opts_max,
+            min_values=1, max_values=1,
+            row=2
+        )
+        self.sel_max_blanks.callback = self.on_select_max_blanks
+
+        # ========== PAGE CONTENT ==========
+        if self.page == 1:
+            self.add_item(self.sel_packs)    # row=0
+            self.add_item(self.sel_regions)  # row=1
+        elif self.page == 2:
+            self.add_item(self.sel_size)         # row=0
+            self.add_item(self.sel_min_blanks)   # row=1
+            self.add_item(self.sel_max_blanks)   # row=2
+
+        # ========== NAVIGATION/CONTROL BUTTONS (ROW 4) ==========
+
+        draft_mode_active = self.lobby.config.draft_mode
+        draft_emoji = "🏀" if draft_mode_active else "🎲"
+        draft_style = ButtonStyle.success if draft_mode_active else ButtonStyle.secondary
+
+        # Disable nav arrows at ends
+        left_disabled = self.page == 1
+        right_disabled = self.page == MAX_PAGE
+
+        self.add_item(Button(
+            emoji=draft_emoji, style=draft_style, row=4,
+            custom_id="toggle_draft"
+        ))
+        self.add_item(Button(
+            emoji="◀️", style=ButtonStyle.primary, row=4,
+            custom_id="page_left", disabled=left_disabled
+        ))
+        self.add_item(Button(
+            emoji="▶️", style=ButtonStyle.primary, row=4,
+            custom_id="page_right", disabled=right_disabled
+        ))
+        self.add_item(Button(
+            emoji="✅", style=ButtonStyle.success, row=4,
+            custom_id="begin_game"
+        ))
+        self.add_item(Button(
+            emoji="❌", style=ButtonStyle.danger, row=4,
+            custom_id="cancel_setup"
+        ))
+
+    # ========== SELECT CALLBACKS ==========
+
+    async def on_select_packs(self, interaction: Interaction):
+        new_cfg = replace(self.lobby.config, expansions=interaction.data["values"])
+        self.lobby.config = new_cfg
+        for opt in self.sel_packs.options:
+            opt.default = opt.value in new_cfg.expansions
+        await interaction.response.edit_message(view=SetupView(self.channel_id, self.bot, self.page))
+
+    async def on_select_regions(self, interaction: Interaction):
+        vals = interaction.data["values"]
+        new_regions = {r: (r in vals) for r in self.lobby.config.regions}
+        new_cfg = replace(self.lobby.config, regions=new_regions)
+        self.lobby.config = new_cfg
+        for opt in self.sel_regions.options:
+            opt.default = opt.value in vals
+        await interaction.response.edit_message(view=SetupView(self.channel_id, self.bot, self.page))
+
+    async def on_select_size(self, interaction: Interaction):
+        size = int(interaction.data["values"][0])
+        new_cfg = replace(self.lobby.config, hand_size=size)
+        self.lobby.config = new_cfg
+        for opt in self.sel_size.options:
+            opt.default = (opt.value == str(size))
+        await interaction.response.edit_message(view=SetupView(self.channel_id, self.bot, self.page))
+
+    async def on_select_min_blanks(self, interaction: Interaction):
+        min_val = int(interaction.data["values"][0])
+        max_val = getattr(self.lobby.config, "max_blanks", 3)
+        if min_val > max_val:
+            min_val = max_val
+        new_cfg = replace(self.lobby.config, min_blanks=min_val)
+        self.lobby.config = new_cfg
+        for opt in self.sel_min_blanks.options:
+            opt.default = (int(opt.value) == min_val)
+        await interaction.response.edit_message(view=SetupView(self.channel_id, self.bot, self.page))
+
+    async def on_select_max_blanks(self, interaction: Interaction):
+        max_val = int(interaction.data["values"][0])
+        min_val = getattr(self.lobby.config, "min_blanks", 1)
+        if max_val < min_val:
+            max_val = min_val
+        new_cfg = replace(self.lobby.config, max_blanks=max_val)
+        self.lobby.config = new_cfg
+        for opt in self.sel_max_blanks.options:
+            opt.default = (int(opt.value) == max_val)
+        await interaction.response.edit_message(view=SetupView(self.channel_id, self.bot, self.page))
+
+    # ========== BUTTON HANDLERS ==========
+
+    async def interaction_check(self, interaction: Interaction):
+        # This is needed so all custom_id buttons work with one method
+        if interaction.data.get("custom_id") == "toggle_draft":
+            await self.on_toggle_draft(interaction)
+        elif interaction.data.get("custom_id") == "page_left":
+            await self.on_page_left(interaction)
+        elif interaction.data.get("custom_id") == "page_right":
+            await self.on_page_right(interaction)
+        elif interaction.data.get("custom_id") == "begin_game":
+            await self.on_begin(interaction)
+        elif interaction.data.get("custom_id") == "cancel_setup":
+            await self.on_cancel(interaction)
+        else:
+            return True
+        return False  # prevents default handling
+
+    async def on_toggle_draft(self, interaction: Interaction):
+        new_cfg = replace(self.lobby.config, draft_mode=not self.lobby.config.draft_mode)
+        self.lobby.config = new_cfg
+        await interaction.response.edit_message(view=SetupView(self.channel_id, self.bot, self.page))
+
+    async def on_page_left(self, interaction: Interaction):
+        prev_page = max(1, self.page - 1)
+        await interaction.response.edit_message(view=SetupView(self.channel_id, self.bot, prev_page))
+
+    async def on_page_right(self, interaction: Interaction):
+        next_page = min(self.page + 1, MAX_PAGE)
+        await interaction.response.edit_message(view=SetupView(self.channel_id, self.bot, next_page))
+
+    async def on_begin(self, interaction: Interaction):
+        enough = len(self.lobby.players) >= 3 or self.lobby.host.id == "171721577979838465"
+        packs  = bool(self.lobby.config.expansions)
+        regs   = any(self.lobby.config.regions.values())
+        size   = isinstance(self.lobby.config.hand_size, int)
+        if not (enough and packs and regs and size):
+            await interaction.response.send_message("❌ Cannot start: check settings.", ephemeral=True)
+            return
+
+        game = await start_game(self.channel_id)
+        await interaction.response.edit_message(content="# BUBBA'S CHALLENGE BEGINS!", view=None)
+        channel = self.bot.get_channel(self.channel_id)
+        
+        lobby = get_lobby(self.channel_id)
+        if lobby and getattr(lobby, "join_message_id", None):
+            try:
+                msg = await channel.fetch_message(lobby.join_message_id)
+                await msg.delete()
+            except Exception as e:
+                print(f"Failed to delete join message: {e}")
+
+        judge_current = getattr(game.state, "current_judge", None)
+        judge_current_name = judge_current.name if judge_current else "Unknown"
+        prompt_card = getattr(game.state, "current_prompt", None)
+        prompt_text = prompt_card.text if prompt_card else "No prompt selected."
+
+        await announce_round_start(channel, game)
+
+    async def on_cancel(self, interaction: Interaction):
+        remove_lobby(self.channel_id)
+        await interaction.response.edit_message(content="🚫 Setup cancelled.", view=None)
+
+# .\src\scripts\export_source.py
+
+import os
+
+output_file = "all_scripts.txt"
+
+with open(output_file, "w", encoding="utf-8") as out:
+    for root, dirs, files in os.walk("."):
+        if ".conda" in dirs:
+            dirs.remove(".conda")
+        for file in files:
+            if file.endswith(".py"):
+                filepath = os.path.join(root, file)
+                with open(filepath, "r", encoding="utf-8") as py_file:
+                    out.write(f"# {filepath}\n\n")
+                    out.write(py_file.read())
+                    out.write("\n\n")
+
+print(f"Python scripts merged into {output_file}")
+
+# .\src\scripts\import_cards.py
+
+import csv, json, re
+
+REGIONS = ['US', 'UK', 'CA', 'AU', 'INTL']
+
+def parse_csv_to_json(csv_path, json_path):
+    # 1. Read all lines
+    with open(csv_path, encoding='utf-8') as f:
+        lines = f.readlines()
+
+    # 2. Locate header and grouping lines
+    header_i   = next(i for i, line in enumerate(lines) if line.startswith('Set,'))
+    group_line = lines[header_i - 1]
+    data_start = header_i + 2
+
+    # 3. Count total columns from grouping line
+    raw_groups = [cell.strip().strip('"').upper() for cell in group_line.strip().split(',')]
+    total_cols = len(raw_groups)
+
+    # 4. Map region → list of indices
+    region_indices = {
+        region: [i for i, g in enumerate(raw_groups) if g == region]
+        for region in REGIONS
+    }
+
+    cards = []
+    for line in lines[data_start:]:
+        row = next(csv.reader([line.strip()])) if line.strip() else []
+        if len(row) < total_cols:
+            row += [''] * (total_cols - len(row))
+
+        if not row or row[0] not in ('Prompt', 'Response'):
+            continue
+
+        ctype   = row[0].lower()
+        text    = row[1].strip()
+        special = row[2].strip()
+
+        card = {"text": text, "type": ctype}
+
+        if ctype == 'prompt':
+            # look for explicit PICK N
+            m = re.search(r'PICK\s*(\d+)', special, re.IGNORECASE)
+            card["pick"] = int(m.group(1)) if m else 1
+
+        # regions object
+        regions = {}
+        for region, idxs in region_indices.items():
+            regions[region.lower()] = any(row[i].strip() for i in idxs)
+        card["regions"] = regions
+
+        cards.append(card)
+
+    # Sanity-check print
+    print("First 20 parsed cards:")
+    for c in cards[:20]:
+        print(c)
+
+    # Write JSON
+    with open(json_path, 'w', encoding='utf-8') as jf:
+        json.dump(cards, jf, indent=2, ensure_ascii=False)
+    print(f"\nConverted {len(cards)} cards → {json_path}")
+
+if __name__ == '__main__':
+    parse_csv_to_json(
+        csv_path = 'data/pack_main.csv',
+        json_path = 'data/pack_main.json'
+    )
+
+
+# .\src\scripts\import_cards_expansions.py
+
+#!/usr/bin/env python3
+import csv
+import json
+import re
+import os
+
+# Always‐true regions for this file
+REGIONS = ['US', 'UK', 'CA', 'AU', 'INTL']
+
+def parse_vertical_packs(csv_path, output_dir):
+    # 1) Read every row into memory
+    with open(csv_path, newline='', encoding='utf-8') as f:
+        rows = list(csv.reader(f))
+
+    i = 0
+    while i < len(rows):
+        row = rows[i]
+        # 2) Detect the start of a new pack block: a row like ["Set", "<Pack Name>", ...]
+        if len(row) > 1 and row[0].strip() == 'Set' and row[1].strip():
+            pack_name = row[1].strip()
+            slug = re.sub(r'[^a-z0-9_]', '', pack_name.lower().replace(' ', '_'))
+
+            cards = []
+            i += 1
+            # 3) Skip any metadata until we hit the first card
+            while i < len(rows) and (not rows[i] or rows[i][0].strip() not in ('Prompt', 'Response')):
+                i += 1
+
+            # 4) Collect all cards until the next "Set" row or end‐of‐file
+            while i < len(rows):
+                r = rows[i]
+                # if we see a new pack header, break out
+                if len(r) > 1 and r[0].strip() == 'Set' and r[1].strip():
+                    break
+
+                typ = r[0].strip() if r else ''
+                if typ in ('Prompt', 'Response'):
+                    text    = r[1].strip() if len(r) > 1 else ''
+                    special = r[2].strip() if len(r) > 2 else ''
+
+                    card = {
+                        "text": text,
+                        "type": typ.lower(),
+                        # every region is true for this file
+                        "regions": {reg.lower(): True for reg in REGIONS}
+                    }
+                    if typ == 'Prompt':
+                        m = re.search(r'PICK\s*(\d+)', special, re.IGNORECASE)
+                        card["pick"] = int(m.group(1)) if m else 1
+
+                    cards.append(card)
+
+                i += 1
+
+            # 5) Write out this pack’s JSON
+            os.makedirs(output_dir, exist_ok=True)
+            out_path = os.path.join(output_dir, f"{slug}.json")
+            with open(out_path, 'w', encoding='utf-8') as jf:
+                json.dump(cards, jf, indent=2, ensure_ascii=False)
+            print(f"Wrote {len(cards)} cards to {out_path}")
+
+        else:
+            i += 1
+
+
+if __name__ == '__main__':
+    parse_vertical_packs(
+        csv_path   = 'data/pack_extra.csv',  # or wherever your file lives
+        output_dir = 'data'                  # JSONs will land here
+    )
+
+
+# .\src\tests\test_game.py
+
+import pytest
+from cards_engine.game            import Game
+from cards_engine.game_config     import GameConfig
+from cards_engine.card_repository import CardRepository
+from cards_engine.player          import Player
+from cards_engine.game_phases     import Phase
+
+@pytest.fixture
+def repo():
+    return CardRepository()
+
+@pytest.fixture
+def players():
+    return [Player(id=str(i), name=f"Bot{i}") for i in range(1, 5)]
+
+@pytest.mark.asyncio
+async def test_full_round(repo, players):
+    """Standard full round (no draft), one judge, three submitters, judge picks."""
+    cfg = GameConfig(
+        expansions=repo.available_expansions(),
+        regions={r: True for r in repo.available_regions()},
+        draft_mode=False,
+        hand_size=5
+    )
+    game = Game(players, cfg, repo)
+    await game.start()
+    assert game.state.phase == Phase.SUBMISSIONS
+    assert game.state.current_prompt is not None
+
+    judge_id = game.state.players[game.state.judge_index].id
+    pick_n = game.state.current_prompt.pick
+    for p in game.state.players:
+        if p.id != judge_id:
+            await game.submit(p.id, list(range(pick_n)))
+
+    assert game.state.phase == Phase.JUDGING
+    subs = list(game.state.submissions.items())
+    winner_id, _ = subs[0]
+    await game.judge(winner_id)
+
+    winner = next(p for p in game.state.players if p.id == winner_id)
+    assert winner.score == 1
+    assert game.state.current_prompt is not None
+
+@pytest.mark.asyncio
+async def test_draft_flow(repo, players):
+    """Full draft, players pick one card per round, hands fill up, queues empty."""
+    pack_size = 4
+    cfg = GameConfig(
+        expansions=repo.available_expansions(),
+        regions={r: True for r in repo.available_regions()},
+        draft_mode=True,
+        hand_size=pack_size
+    )
+    game = Game(players, cfg, repo)
+    await game.start()
+    assert game.state.phase == Phase.DRAFT_PICKING
+    for p in game.state.players:
+        q = game.state.draft_queues[p.id]
+        assert len(q) == pack_size
+        assert p.hand == []
+    # Simulate pass-and-pick
+    for _ in range(pack_size):
+        for p in game.state.players:
+            await game.draft_pick(p.id, 0)
+    assert game.state.phase == Phase.SUBMISSIONS
+    for p in game.state.players:
+        assert len(p.hand) == pack_size
+    for q in game.state.draft_queues.values():
+        assert q == []
+
+# -------------------------
+# EDGE CASES & ERROR TESTS
+# -------------------------
+
+@pytest.mark.asyncio
+async def test_judge_cannot_submit(repo, players):
+    """Judge should not be allowed to submit cards."""
+    cfg = GameConfig(
+        expansions=repo.available_expansions(),
+        regions={r: True for r in repo.available_regions()},
+        draft_mode=False,
+        hand_size=3
+    )
+    game = Game(players, cfg, repo)
+    await game.start()
+    judge = game.state.players[game.state.judge_index]
+    with pytest.raises(RuntimeError):
+        await game.submit(judge.id, [0])
+
+@pytest.mark.asyncio
+async def test_wrong_number_of_cards(repo, players):
+    """Player tries to submit wrong number of cards for prompt."""
+    cfg = GameConfig(
+        expansions=repo.available_expansions(),
+        regions={r: True for r in repo.available_regions()},
+        draft_mode=False,
+        hand_size=3
+    )
+    game = Game(players, cfg, repo)
+    await game.start()
+    judge_id = game.state.players[game.state.judge_index].id
+    non_judge = next(p for p in game.state.players if p.id != judge_id)
+    wrong_count = [0] * (game.state.current_prompt.pick + 1)
+    with pytest.raises(ValueError):
+        await game.submit(non_judge.id, wrong_count)
+
+@pytest.mark.asyncio
+async def test_submit_wrong_phase(repo, players):
+    """Player tries to submit in wrong phase (not SUBMISSIONS)."""
+    cfg = GameConfig(
+        expansions=repo.available_expansions(),
+        regions={r: True for r in repo.available_regions()},
+        draft_mode=False,
+        hand_size=3
+    )
+    game = Game(players, cfg, repo)
+    await game.start()
+    game.state.phase = Phase.JUDGING
+    judge_id = game.state.players[game.state.judge_index].id
+    non_judge = next(p for p in game.state.players if p.id != judge_id)
+    with pytest.raises(ValueError):
+        await game.submit(non_judge.id, [0])
+
+@pytest.mark.asyncio
+async def test_judge_pick_wrong_phase(repo, players):
+    """Judge tries to pick winner in non-JUDGING phase."""
+    cfg = GameConfig(
+        expansions=repo.available_expansions(),
+        regions={r: True for r in repo.available_regions()},
+        draft_mode=False,
+        hand_size=3
+    )
+    game = Game(players, cfg, repo)
+    await game.start()
+    # skip to submissions, but don't submit all cards
+    with pytest.raises(ValueError):
+        await game.judge(players[0].id)
+
+@pytest.mark.asyncio
+async def test_draft_pick_wrong_phase(repo, players):
+    """Player tries to draft pick in the wrong phase."""
+    cfg = GameConfig(
+        expansions=repo.available_expansions(),
+        regions={r: True for r in repo.available_regions()},
+        draft_mode=False,
+        hand_size=3
+    )
+    game = Game(players, cfg, repo)
+    await game.start()
+    # Not in draft phase
+    with pytest.raises(RuntimeError):
+        await game.draft_pick(players[0].id, 0)
+
+@pytest.mark.asyncio
+async def test_game_state_reset(repo, players):
+    """GameState.reset() brings state to waiting and clears hands, scores, etc."""
+    cfg = GameConfig(
+        expansions=repo.available_expansions(),
+        regions={r: True for r in repo.available_regions()},
+        draft_mode=False,
+        hand_size=3
+    )
+    game = Game(players, cfg, repo)
+    await game.start()
+    # Play one round
+    judge_id = game.state.players[game.state.judge_index].id
+    pick_n = game.state.current_prompt.pick
+    for p in game.state.players:
+        if p.id != judge_id:
+            await game.submit(p.id, list(range(pick_n)))
+    await game.judge([p for p in game.state.players if p.id != judge_id][0].id)
+    # Now reset
+    game.state.reset()
+    assert game.state.phase == Phase.WAITING
+    assert all(p.hand == [] for p in game.state.players)
+    assert all(p.score == 0 for p in game.state.players)
+    assert all(p.id not in game.state.submissions for p in game.state.players)
+    assert game.state.current_prompt is None
+
+# -------------------------------
+# CARD REPOSITORY EDGE TESTS
+# -------------------------------
+
+def test_repo_filtering(repo):
+    """Test expansion and region filtering returns expected cards."""
+    expansions = repo.available_expansions()
+    regions = repo.available_regions()
+    cards = repo.filter(expansions=[expansions[0]])
+    assert all(card.expansion == expansions[0] for card in cards)
+    if regions:
+        cards_region = repo.filter(regions={regions[0]: True})
+        assert all(card.regions[regions[0]] for card in cards_region)
+
+def test_format_prompt_blanks(repo):
+    """Check that format_prompt replaces blanks and appends responses."""
+    card = next((c for c in repo.load() if c.card_type == "prompt" and c.has_blanks), None)
+    if not card:
+        pytest.skip("No prompt with blanks in test set")
+    result = card.format_prompt(["foo", "bar"])
+    assert "**foo**" in result
+
+def test_format_prompt_no_blanks(repo):
+    """Check that format_prompt appends response if no blanks."""
+    card = next((c for c in repo.load() if c.card_type == "prompt" and not c.has_blanks), None)
+    if not card:
+        pytest.skip("No prompt without blanks in test set")
+    result = card.format_prompt(["hello"])
+    assert "**hello**" in result
+
+# ---------------------
+# OPTIONAL: FUZZ TESTS
+# ---------------------
+
+import random
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("draft_mode", [False, True])
+async def test_randomized_games(repo, draft_mode):
+    """Simulate multiple random short games to shake out state bugs."""
+    for _ in range(5):  # Five short games
+        num_players = random.randint(3, 6)
+        players = [Player(id=str(i), name=f"Bot{i}") for i in range(num_players)]
+        expansions = random.sample(repo.available_expansions(), k=1)
+        regions = {r: True for r in repo.available_regions()}
+        hand_size = random.randint(3, 7)
+
+        white_cards = repo.filter(
+            card_type="response",
+            regions=regions,
+            expansions=expansions
+        )
+        if draft_mode and len(white_cards) < len(players) * hand_size:
+            continue  # Not enough for a fair draft, skip this combo
+        if not draft_mode and len(white_cards) < len(players) * hand_size:
+            continue  # Not enough for classic deal, skip
+
+
+        cfg = GameConfig(
+            expansions=expansions,
+            regions=regions,
+            draft_mode=draft_mode,
+            hand_size=hand_size
+        )
+        game = Game(players, cfg, repo)
+        await game.start()
+        # Play a single round if not in draft phase
+        if game.state.phase == Phase.DRAFT_PICKING:
+            for _ in range(cfg.hand_size):
+                for p in game.state.players:
+                    await game.draft_pick(p.id, 0)
+        if game.state.phase == Phase.SUBMISSIONS:
+            judge_id = game.state.players[game.state.judge_index].id
+            pick_n = game.state.current_prompt.pick
+            for p in game.state.players:
+                if p.id != judge_id:
+                    await game.submit(p.id, list(range(pick_n)))
+            assert game.state.phase == Phase.JUDGING
+
+if __name__ == "__main__":
+    pytest.main(["-v", __file__])
+

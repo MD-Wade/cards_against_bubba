@@ -1,6 +1,0 @@
-[run]
-source = cards_against_bubba
-omit = 
-    tests/*
-    autoapp.py
-
