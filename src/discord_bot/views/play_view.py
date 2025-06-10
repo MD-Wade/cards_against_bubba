@@ -2,13 +2,13 @@ import discord
 import random
 from discord.ui import View, Select, Button
 from cards_engine.game_phases import Phase
-from discord_bot.services.game_manager import get_game
+from discord_bot.services.state_manager import get_game
 
 class PlayView(View):
     def __init__(self, channel_id, player_id, bot, picks=None, pick_index=0):
         super().__init__(timeout=60)
         self.channel_id = channel_id
-        self.player_id = player_id
+        self.player_id = str(player_id)
         self.bot = bot
         self.picks = picks or []
         self.pick_index = pick_index

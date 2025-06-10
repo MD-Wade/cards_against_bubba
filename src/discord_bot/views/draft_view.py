@@ -2,7 +2,7 @@
 
 from discord import ui, SelectOption, Interaction
 from cards_engine.game_phases import Phase
-from discord_bot.services.game_manager import get_game
+from discord_bot.services.state_manager import get_game
 
 class DraftView(ui.View):
     """A persistent ephemeral view that walks a single player through

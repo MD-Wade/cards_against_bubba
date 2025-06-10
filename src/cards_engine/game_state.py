@@ -1,6 +1,6 @@
 from dataclasses import dataclass, field
 from enum import Enum
-from typing import List, Optional, Dict
+from typing import List, Optional, Dict, Tuple
 from .card import Card
 from .player import Player
 from .game_phases import Phase
@@ -8,6 +8,7 @@ from .game_phases import Phase
 @dataclass
 class GameState:
     players:                List[Player]
+    score_limit:            int
     hand_size:              int = 7
     draft_queues:           Dict[str, List[Card]] = field(default_factory=dict)
     draft_kept:             Dict[str, List[Card]] = field(default_factory=dict)
@@ -21,8 +22,8 @@ class GameState:
     phase:                  Phase = Phase.WAITING
     last_round_selected_id: Optional[str] = None
     last_round_selected_cards: List[Card] = field(default_factory=list)
-
     submissions:            Dict[str, List[Card]] = field(default_factory=dict)
+    submissions_shuffled:   List[Tuple[str, List[Card]]] = field(default_factory=list)
 
     @property
     def current_judge(self) -> Player:
@@ -34,7 +35,7 @@ class GameState:
         
     def player_by_id(self, player_id: str) -> Optional[Player]:
         for player in self.players:
-            if player.id == player_id:
+            if str(player.id) == str(player_id):
                 return player
         return None
 
@@ -48,3 +49,4 @@ class GameState:
         self.black_deck.clear()
         self.white_deck.clear()
         self.submissions.clear()
+        self.submissions_shuffled.clear()

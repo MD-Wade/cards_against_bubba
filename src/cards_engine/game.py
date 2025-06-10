@@ -19,11 +19,13 @@ class Game:
                  players:    List[Player],
                  config:     GameConfig,
                  repository: CardRepository,
+                 host_id: str = "",
                  channel_id: int = None) -> None:
         self.players = players
         self.config = config
         self.repo   = repository
         self.channel_id = channel_id
+        self.host_id = host_id
         self.engine = GameEngine()
         self._phase_listeners: List[PhaseListener] = []
         self.state = None
@@ -32,13 +34,11 @@ class Game:
         self._phase_listeners.append(fn)
 
     async def _set_phase(self, new_phase: Phase) -> None:
-        print(f"Game._set_phase: {new_phase}, id(self)={id(self)}")
         old = self.state.phase
         if old is new_phase:
             return
         self.state.phase = new_phase
         for fn in self._phase_listeners:
-            print(f"Calling phase listener {fn} for Game id={id(self)}")
             result = fn(self, old, new_phase)
             if inspect.isawaitable(result):
                 await result
@@ -57,6 +57,7 @@ class Game:
 
         self.state = GameState(
             players= self.players,
+            score_limit= self.config.score_limit,
             hand_size= self.config.hand_size,
             black_deck= black,
             white_deck= white
@@ -71,7 +72,6 @@ class Game:
     async def submit(self, player_id: str, card_indices: List[int]) -> None:
         if not self.state:
             raise RuntimeError("Game not started yet.")
-        
         player = self.state.player_by_id(player_id)
         cards  = [player.hand[i] for i in card_indices]
         all_in = self.engine.submit_cards(self.state, player_id, cards)
@@ -79,7 +79,6 @@ class Game:
             await self._set_phase(Phase.JUDGING)
 
     async def judge(self, winner_id: str) -> None:
-        print("Game.judge")
         if not self.state:
             raise RuntimeError("Game not started yet.")
 
@@ -92,4 +91,12 @@ class Game:
         if self.state.phase is not Phase.DRAFT_PICKING:
             raise RuntimeError(f"Not in draft phase: {self.state.phase}")
         next_phase = self.engine.draft_pick(self.state, player_id, pick_index)
+        await self._set_phase(next_phase)
+
+    async def skip(self, player_id: str) -> None:
+        if not self.state:
+            raise RuntimeError("Game not started yet.")
+        if self.state.phase is not Phase.SUBMISSIONS:
+            raise RuntimeError(f"Not in submission phase: {self.state.phase}")
+        next_phase = self.engine.skip(self.state, player_id)
         await self._set_phase(next_phase)

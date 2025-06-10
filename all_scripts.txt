@@ -69,17 +69,16 @@ class Card:
                     prev_char = self.text[start-1] if start > 0 else ""
                     if prev_char not in ".!?" and re.match(r"^(The|A|An)\b", resp):
                         resp = resp[0].lower() + resp[1:]
-                    return f"{resp}"
+                    return f"**{resp}**"
                 return match.group(0)
             replacer.idx = 0
             out = re.sub(r'_{3,}', replacer, out)
             return out
         else:
-            resp_text = " ".join(f"{resp}" for resp in responses)
+            resp_text = " ".join(f"**{resp}**" for resp in responses)
             if resp_text:
                 out = f"{out} {resp_text}"
             return out
-
 
 # .\src\cards_engine\card_repository.py
 
@@ -204,11 +203,13 @@ class Game:
                  players:    List[Player],
                  config:     GameConfig,
                  repository: CardRepository,
+                 host_id: str = "",
                  channel_id: int = None) -> None:
         self.players = players
         self.config = config
         self.repo   = repository
         self.channel_id = channel_id
+        self.host_id = host_id
         self.engine = GameEngine()
         self._phase_listeners: List[PhaseListener] = []
         self.state = None
@@ -256,7 +257,6 @@ class Game:
     async def submit(self, player_id: str, card_indices: List[int]) -> None:
         if not self.state:
             raise RuntimeError("Game not started yet.")
-        
         player = self.state.player_by_id(player_id)
         cards  = [player.hand[i] for i in card_indices]
         all_in = self.engine.submit_cards(self.state, player_id, cards)
@@ -279,11 +279,28 @@ class Game:
         next_phase = self.engine.draft_pick(self.state, player_id, pick_index)
         await self._set_phase(next_phase)
 
+    async def skip(self, player_id: str) -> None:
+        if not self.state:
+            raise RuntimeError("Game not started yet.")
+        if self.state.phase is not Phase.SUBMISSIONS:
+            raise RuntimeError(f"Not in submission phase: {self.state.phase}")
+        next_phase = self.engine.skip(self.state, player_id)
+        await self._set_phase(next_phase)
+
 # .\src\cards_engine\game_config.py
 
 # game_config.py
 from dataclasses import dataclass, field
 from typing import List, Dict
+
+hand_size_min = 3
+hand_size_max = 14
+max_players_min = 3
+max_players_max = 12
+blank_count_min = 1
+blank_count_max = 3
+score_limit_min = 1
+score_limit_max = 20
 
 @dataclass(frozen=True)
 class GameConfig:
@@ -293,8 +310,10 @@ class GameConfig:
     })
     draft_mode: bool                    = True
     hand_size: int                      = 6
+    score_limit: int                    = 6
     min_blanks: int                     = 1
     max_blanks: int                     = 3
+    max_players: int                    = 10
 
 # .\src\cards_engine\game_engine.py
 
@@ -318,6 +337,7 @@ class GameEngine:
             )
 
         state.submissions.clear()
+        state.submissions_shuffled = []
         for p in state.players:
             p.hand = [state.white_deck.pop() for _ in range(state.hand_size)]
             p.score = 0
@@ -328,6 +348,7 @@ class GameEngine:
 
     def draw_prompt(self, state: GameState) -> None:
         state.submissions.clear()
+        state.submissions_shuffled = []
         state.current_prompt = state.black_deck.pop()
 
     def submit_cards(self, state: GameState, player_id: str, cards: List[Card]) -> bool:
@@ -352,10 +373,6 @@ class GameEngine:
         state.submissions[player_id] = cards
 
         all_in = self._all_non_judges_submitted(state)
-        if all_in:
-            print(f"[DEBUG] Player {player_id} submitted {len(cards)} cards.")
-        else:
-            print(f"[DEBUG] Player {player_id} has submitted {len(cards)} cards, waiting for others...")
         return all_in
             
 
@@ -425,6 +442,18 @@ class GameEngine:
             return Phase.SUBMISSIONS
         return Phase.DRAFT_PICKING
 
+    def skip_prompt(self, state: GameState, player_id: str) -> Phase:
+        """Skip the current prompt and draw a new one."""
+        state.phase_check(Phase.SUBMISSIONS)
+        player = self.find_player(state, player_id)
+
+        if state.players[state.judge_index] is not player:
+            raise RuntimeError("Only the Judge can skip prompts.")
+
+        self.rollback_submitted_cards(state)
+        self.draw_prompt(state)
+        return Phase.SUBMISSIONS
+
     # ─── Helpers ────────────────────────────────────────────────
 
     def find_player(self, state: GameState, player_id: str) -> Player:
@@ -435,12 +464,9 @@ class GameEngine:
         for p in state.players:
             name = p.name if p.name else p.id
             if p is judge:
-                print(f"[DEBUG] Player {name} is the judge.")
                 continue
             if p.id not in state.submissions:
-                print(f"[DEBUG] Player {name} has not submitted.")
                 return False
-        print("[DEBUG] All non-judges have submitted.")
         return True
 
     def _is_judge(self, state: GameState, player: Player) -> bool:
@@ -450,6 +476,17 @@ class GameEngine:
         for p in state.players:
             while len(p.hand) < state.hand_size:
                 p.hand.append(state.white_deck.pop())
+
+    def rollback_submitted_cards(self, state: GameState) -> None:
+        """Rollback the submitted cards for all players."""
+        # For every submission, return the cards to the player's hand
+        for player_id, cards in state.submissions.items():
+            player = state.player_by_id(player_id)
+            if player:
+                player.hand.extend(cards)
+        # Clear submissions
+        state.submissions.clear()
+        state.submissions_shuffled = []
 
 # .\src\cards_engine\game_phases.py
 
@@ -465,7 +502,7 @@ class Phase(str, Enum):
 
 from dataclasses import dataclass, field
 from enum import Enum
-from typing import List, Optional, Dict
+from typing import List, Optional, Dict, Tuple
 from .card import Card
 from .player import Player
 from .game_phases import Phase
@@ -488,6 +525,7 @@ class GameState:
     last_round_selected_cards: List[Card] = field(default_factory=list)
 
     submissions:            Dict[str, List[Card]] = field(default_factory=dict)
+    submissions_shuffled:   List[Tuple[str, List[Card]]] = field(default_factory=list)
 
     @property
     def current_judge(self) -> Player:
@@ -499,7 +537,7 @@ class GameState:
         
     def player_by_id(self, player_id: str) -> Optional[Player]:
         for player in self.players:
-            if player.id == player_id:
+            if str(player.id) == str(player_id):
                 return player
         return None
 
@@ -513,7 +551,7 @@ class GameState:
         self.black_deck.clear()
         self.white_deck.clear()
         self.submissions.clear()
-
+        self.submissions_shuffled.clear()
 
 # .\src\cards_engine\player.py
 
@@ -567,8 +605,10 @@ intents = Intents.default()
 
 import discord
 from discord.ext import commands
-from discord import Option
-from discord_bot.services.game_manager  import create_lobby, get_game
+import asyncio
+from discord_bot.services.state_manager import get_game, remove_game
+from discord_bot.services.game_manager  import create_lobby
+from discord_bot.services.game_flow     import handle_play, handle_judge, handle_draft, handle_stop, handle_skip, handle_join
 from discord_bot.views.setup_view       import SetupView
 from discord_bot.views.join_view        import JoinView
 from discord_bot.views.draft_view       import DraftView
@@ -599,26 +639,41 @@ class GameCog(commands.Cog):
 
         lobby = create_lobby(
             channel_id=ctx.channel_id,
-            host_id=ctx.author.id,
+            host_id=str(ctx.author.id),
             host_name=ctx.author.display_name
         )
 
         player_host = Player(id=str(ctx.author.id), name=ctx.author.display_name)
         lobby.players.append(player_host)
+        print(f"[DEBUG] Appended player {player_host.name} with ID {player_host.id} to lobby.")
 
-        view_join = JoinView(lobby)
+        async def on_join_button(interaction: discord.Interaction):
+            """Handle the join button click."""
+            await handle_join(interaction)
+
+        view_join = JoinView(lobby, on_join_button=on_join_button)
         join_message = await ctx.channel.send(
             f"👋 {ctx.author.display_name} started a new game of Cards Against Bubba! Join with `/join` or by clicking the button!",
             view=view_join,
         )
+        await asyncio.sleep(1)
         lobby.join_message_id = join_message.id
 
         view_setup = SetupView(ctx.channel_id, bot=self.bot)
         await ctx.respond(
-            "👋 Host panel: Select packs and regions, then set hand size and draft mode, and ▶️ Launch!",
+            content="CONFIGURATION: Please configure which packs and regions to enable, as well as other game settings.",
             view=view_setup,
             ephemeral=True
         )
+
+    @commands.slash_command(
+            name="join",
+            description="Join the current game of Cards Against Bubba",
+            guild_ids=[1075249749357252680, 1167164629844234270]
+            )
+    async def join(self, ctx: discord.ApplicationContext):
+        """Join the current game."""
+        await handle_join(ctx)
 
     @commands.slash_command(
             name="draft", 
@@ -626,17 +681,15 @@ class GameCog(commands.Cog):
             guild_ids=[1075249749357252680, 1167164629844234270]
             )
     async def draft(self, ctx: discord.ApplicationContext):
-        game = get_game(ctx.channel_id)
-        if not game or game.state.phase is not Phase.DRAFT_PICKING:
-            return await ctx.respond("No draft in progress.", ephemeral=True)
+        await handle_draft(ctx, game=get_game(ctx.channel_id))
 
-        # send (or re‐use) one ephemeral message per player
-        view = DraftView(ctx.channel_id, str(ctx.author.id))
-        await ctx.respond(
-            "Your draft pack, pick one card:",
-            view=view,
-            ephemeral=True
-        )
+    @commands.slash_command(
+            name="stop",
+            description="STOP! STOP!!!!!!",
+            guild_ids=[1075249749357252680, 1167164629844234270]
+            )
+    async def stop(self, ctx: discord.ApplicationContext):
+        await handle_stop(ctx, get_game, remove_game)
 
     @commands.slash_command(
         name="play",
@@ -644,23 +697,7 @@ class GameCog(commands.Cog):
         guild_ids=[1075249749357252680, 1167164629844234270]
     )
     async def play(self, ctx: discord.ApplicationContext):
-        game = get_game(ctx.channel_id)
-        if not game or game.state.phase != Phase.SUBMISSIONS:
-            return await ctx.respond("No active round to play cards.", ephemeral=True)
-
-        player = game.state.player_by_id(str(ctx.author.id))
-        if not player:
-            return await ctx.respond("You are NOT in this game!", ephemeral=True)
-        view = PlayView(ctx.channel_id, str(ctx.author.id), self.bot)
-        if view.pick_count == 1:
-            msg = "Select a response to play for this prompt."
-        else:
-            msg = "Select a response to play for the first blank of this prompt."
-        await ctx.respond(
-            msg,
-            view=view,
-            ephemeral=True
-        )
+        await handle_play(ctx, bot=self.bot)
 
     @commands.slash_command(
         name="judge",
@@ -668,26 +705,19 @@ class GameCog(commands.Cog):
         guild_ids=[1075249749357252680, 1167164629844234270]
     )
     async def judge(self, ctx: discord.ApplicationContext):
-        game = get_game(ctx.channel_id)
-        if not game or game.state.phase != Phase.JUDGING:
-            return await ctx.respond("No active round to judge responses.", ephemeral=True)
-
-        player = game.state.player_by_id(str(ctx.author.id))
-        if not player or player.id != game.state.current_judge.id:
-            return await ctx.respond("You are NOT the judge this round!", ephemeral=True)
-
-        async def on_judge_pick(player_id: str):
+        async def on_judge_pick(game, player_id):
             await self.on_judge_pick(ctx.channel_id, player_id)
+        await handle_judge(ctx, game=get_game(ctx.channel_id), on_judge_pick=on_judge_pick)
 
-        view = JudgeView(game, judge_id=game.state.current_judge.id, on_judge_pick=on_judge_pick)
-        await ctx.respond(
-            "Select the best response from the submissions.:",
-            view=view,
-            ephemeral=True
-        )
+    @commands.slash_command(
+        name="skip",
+        description="Discards the current prompt and moves to the next one.",
+        guild_ids=[1075249749357252680, 1167164629844234270]
+    )
+    async def skip(self, ctx: discord.ApplicationContext):
+        await handle_skip(ctx, bot=self.bot, game=get_game(ctx.channel_id))
 
     async def on_judge_pick(self, channel_id: int, player_id: str):
-        print("GameCog.on_judge_pick")
         game = get_game(channel_id)
         await game.judge(player_id)
 
@@ -697,7 +727,7 @@ class GameCog(commands.Cog):
             await interaction.response.send_message("Only the judge can judge this round!", ephemeral=True)
             return
         # Build the actual judge view
-        view = JudgeView(game, judge_id=game.state.current_judge.id, on_judge_pick=...)  # etc.
+        view = JudgeView(game, judge_id=game.state.current_judge.id, on_judge_pick=self.on_judge_pick)
         await interaction.response.send_message(
             "Select the best response:",
             view=view,
@@ -712,17 +742,23 @@ def setup(bot):
 
 import asyncio
 import random
-from discord_bot.views.judge_button_view import JudgeButtonView
+from discord import Interaction, ApplicationContext
+from cards_engine.player import Player
 from cards_engine.game_phases import Phase
+from discord_bot.services.state_manager import get_lobby
+from discord_bot.views.judge_button_view import JudgeButtonView
 from discord_bot.views.play_button_view import PlayButtonView
+from discord_bot.views.play_view import PlayView
+from discord_bot.views.judge_view import JudgeView
+from discord_bot.views.draft_view import DraftView
 
 async def reveal_submissions(channel, game, on_judge_button, delay=3.0):
     """Reveal all submissions anonymously to the main channel, one at a time."""
     submissions = list(game.state.submissions.items())
     prompt = game.state.current_prompt
 
-    # Shuffle for fairness
     random.shuffle(submissions)
+    game.state.submissions_shuffled = submissions
 
     await channel.send("✅ All responses are in! Revealing submissions anonymously...")
     await asyncio.sleep(delay)
@@ -734,17 +770,23 @@ async def reveal_submissions(channel, game, on_judge_button, delay=3.0):
         await asyncio.sleep(delay)
 
     judge = game.state.current_judge
-    view_judge_button = JudgeButtonView(game, on_judge_button)
+    async def on_judge_pick(game, player_id):
+        await game.judge(player_id)
+    view_judge_button = JudgeButtonView(
+        game, 
+        on_judge_button=lambda interaction, game: handle_judge(interaction, game, on_judge_pick=on_judge_pick)
+    )
     await channel.send(
         f"All submissions revealed! <@{judge.id}>, please select the best response using `/judge` command!\n",
         view=view_judge_button
     )
 
-async def announce_round_start(channel, game):
+async def announce_round_start(channel, game, on_play_button):
     judge_current = getattr(game.state, "current_judge", None)
-    judge_current_name = judge_current.name if judge_current else "Unknown"
+    judge_mention = f"<@{judge_current.id}>" if judge_current else "Unknown"
     prompt_card = getattr(game.state, "current_prompt", None)
     prompt_text = prompt_card.text if prompt_card else "No prompt selected."
+    prompt_picks = prompt_card.pick if prompt_card else 1
 
     if game.state.phase == Phase.DRAFT_PICKING:
         await channel.send(
@@ -752,27 +794,175 @@ async def announce_round_start(channel, game):
             "Please type **/draft** to begin selecting your cards!"
         )
     else:
-        view_play_button = PlayButtonView(game, bot=game.bot)
+        view_play_button = PlayButtonView(game, on_play_button=on_play_button)
+        prompt_picks_plurality = "blanks" if prompt_picks > 1 else "blank"
+        message_content = (
+            f"_ _\nThe Judge is currently **{judge_mention}**.\n"
+            f"Your prompt is: **{prompt_text}**\n"
+            f"(There should be **{prompt_picks}** {prompt_picks_plurality}. If there is not, the Judge may `/skip`.)\n"
+        )
         await channel.send(
-            f"\n\nThe judge is currently **{judge_current_name}**.\n"
-            f"Your prompt is:\n**{prompt_text}**",
+            content=message_content,
             view=view_play_button
         )
 
+async def handle_play(ctx_or_interaction, game, bot, *, as_button=False):
+    channel_id, user_id = get_channel_and_user_id(ctx_or_interaction)
+
+    if not game:
+        return await respond(ctx_or_interaction, "There's no game, pal.", ephemeral=True)
+    if not game.state:
+        return await respond(ctx_or_interaction, "The game is not ready yet.", ephemeral=True)
+    if game.state.phase != Phase.SUBMISSIONS:
+        return await respond(ctx_or_interaction, "You can only submit cards during submissions, obviously.", ephemeral=True)
+
+    player = game.state.player_by_id(user_id)
+    if not player:
+        return await respond(ctx_or_interaction, "You are NOT in this game!", ephemeral=True)
+
+    if game.state.current_judge.id == player.id:
+        return await respond(ctx_or_interaction, "You are the judge this round!", ephemeral=True)
+
+    view = PlayView(channel_id, user_id, bot)
+    msg = "Select a response to play for this prompt." if view.pick_count == 1 else "Select a response to play for the first blank of this prompt."
+    await respond(ctx_or_interaction, msg, view=view, ephemeral=True)
+
+async def handle_judge(ctx_or_interaction, game, *, on_judge_pick):
+    channel_id, user_id = get_channel_and_user_id(ctx_or_interaction)
+
+    if not game:
+        return await respond(ctx_or_interaction, "There's no game, pal.", ephemeral=True)
+    if not game.state:
+        return await respond(ctx_or_interaction, "The game is not ready yet.", ephemeral=True)
+    
+    if game.state.phase != Phase.JUDGING:
+        return await respond(ctx_or_interaction, "You can only judge during the judging phase, bro.", ephemeral=True)
+
+    player = game.state.player_by_id(user_id)
+    if not player or player.id != game.state.current_judge.id:
+        return await respond(ctx_or_interaction, "You are NOT the judge this round!", ephemeral=True)
+
+    view = JudgeView(game, judge_id=game.state.current_judge.id, on_judge_pick=on_judge_pick)
+    await respond(ctx_or_interaction, "Select the best response from the submissions:", view=view, ephemeral=True)
+
+async def handle_draft(ctx_or_interaction, game):
+    channel_id, user_id = get_channel_and_user_id(ctx_or_interaction)
+
+    if not game or game.state.phase != Phase.DRAFT_PICKING:
+        return await respond(ctx_or_interaction, "No draft in progress.", ephemeral=True)
+
+    view = DraftView(channel_id, user_id)
+    await respond(ctx_or_interaction, "Your draft pack, pick one card:", view=view, ephemeral=True)
+
+async def handle_stop(ctx_or_interaction, game_manager_get_game, game_manager_remove_game):
+    """Handler for stopping a game. Expects ctx or interaction, plus injected get/remove game funcs."""
+    channel_id, user_id = get_channel_and_user_id(ctx_or_interaction)
+
+    game = game_manager_get_game(channel_id)
+    if not game:
+        return await respond(ctx_or_interaction, "❌ No game is currently running in this channel.", ephemeral=True)
+
+    # Host is usually first in players or lobby.host, tweak as needed!
+    host_id = game.host_id
+    if str(user_id) != str(host_id):
+        return await respond(ctx_or_interaction, "❌ WHO do you think YOU are? The host?", ephemeral=True)
+
+    game_manager_remove_game(channel_id)
+    await respond(ctx_or_interaction, "Ending the game now ...", ephemeral=True)
+    try:
+        await ctx_or_interaction.channel.send("🛑 **Game ended by the host!**")
+    except Exception:
+        pass
+
+async def handle_skip(ctx_or_interaction, bot, game):
+    """Handler for skipping the current prompt."""
+    channel_id, user_id = get_channel_and_user_id(ctx_or_interaction)
+
+    if not game:
+        return await respond(ctx_or_interaction, "What game are you even trying to skip?", ephemeral=True)
+    if not game.state or game.state.phase != Phase.SUBMISSIONS:
+        return await respond(ctx_or_interaction, "You can only skip prompts during the submission phase.", ephemeral=True)
+
+    player = game.state.player_by_id(user_id)
+    if not player:
+        return await respond(ctx_or_interaction, "You are NOT in this game!", ephemeral=True)
+    if player.id != game.state.current_judge.id:
+        return await respond(ctx_or_interaction, "You are NOT the judge this round!", ephemeral=True)
+
+    game.engine.draw_prompt(game.state)
+    await respond(ctx_or_interaction, "Prompt skipped!", ephemeral=True)
+    await asyncio.sleep(0.5)
+    await ctx_or_interaction.channel.send(
+        f"⏭️ The Judge, **{player.name}**, has skipped the current prompt. A new one has been drawn!"
+    )
+    await asyncio.sleep(0.5)
+    def on_play_button(interaction, game):
+        return handle_play(interaction, game, bot=bot, as_button=True)
+    await announce_round_start(
+        ctx_or_interaction.channel, game,
+        on_play_button=on_play_button
+    )
+
+async def handle_join(ctx_or_interaction):
+    channel_id, user_id = get_channel_and_user_id(ctx_or_interaction)
+    
+    # Check if there's an active lobby
+    lobby = get_lobby(channel_id)
+    if not lobby:
+        return await respond(ctx_or_interaction, "What game are you even joining?", ephemeral=True)
+    
+    # Check if the user is already in the lobby
+    if any(player.id == str(user_id) for player in lobby.players):
+        return await respond(ctx_or_interaction, "You are already in the game!", ephemeral=True)
+    
+    if len(lobby.players) >= lobby.config.max_players:
+        return await respond(ctx_or_interaction, "The lobby is full! You can't join.", ephemeral=True)
+
+    # Add the player
+    player_name = (ctx_or_interaction.author.display_name 
+                   if isinstance(ctx_or_interaction, ApplicationContext) 
+                   else ctx_or_interaction.user.display_name)
+    new_player = Player(id=str(user_id), name=player_name)
+    lobby.players.append(new_player)
+    
+    player_count = len(lobby.players)
+    players_plurality = "players" if player_count != 1 else "player"
+    await respond(ctx_or_interaction, f"✅ {player_name} has joined the game! (Now {player_count} {players_plurality}).", ephemeral=False)
+
+
+
+# Helper: handle both ctx.respond() and interaction.response.send_message()
+async def respond(ctx_or_interaction, *args, **kwargs):
+    try:
+        # Slash command context
+        await ctx_or_interaction.respond(*args, **kwargs)
+    except AttributeError:
+        # Component interaction
+        if not ctx_or_interaction.response.is_done():
+            await ctx_or_interaction.response.send_message(*args, **kwargs)
+        else:
+            await ctx_or_interaction.followup.send(*args, **kwargs)
+
+def get_channel_and_user_id(ctx_or_interaction):
+    if isinstance(ctx_or_interaction, ApplicationContext):
+        return ctx_or_interaction.channel_id, str(ctx_or_interaction.author.id)
+    elif isinstance(ctx_or_interaction, Interaction):
+        return ctx_or_interaction.channel.id, str(ctx_or_interaction.user.id)
+    else:
+        raise ValueError("Unknown context type")
 
 # .\src\discord_bot\services\game_manager.py
 
 import random
 import asyncio
-from typing                         import Dict
-from cards_engine.game              import Game
-from cards_engine.card_repository   import CardRepository
-from .lobby                         import Lobby
-from cards_engine.game_phases       import Phase
-from cards_engine.player            import Player
-from .game_flow                     import reveal_submissions, announce_round_start
-from discord_bot.views.play_button_view import PlayButtonView
-from discord_bot.views.judge_button_view import JudgeButtonView
+from typing                             import Dict
+from cards_engine.game                  import Game
+from cards_engine.card_repository       import CardRepository
+from cards_engine.game_phases           import Phase
+from cards_engine.player                import Player
+from discord_bot.services.lobby         import Lobby
+from discord_bot.services.state_manager import set_game, set_lobby, get_lobby, remove_lobby
+from discord_bot.services.game_flow     import reveal_submissions, announce_round_start, handle_play, handle_judge, handle_draft
 
 _repo = CardRepository()
 _lobbies: Dict[int, Lobby] = {}   # channel_id → Lobby
@@ -784,35 +974,26 @@ def set_bot(bot) -> None:
     global _bot
     _bot = bot
 
-def get_repository() -> CardRepository:
-    """Returns the global card repository."""
-    return _repo
-
 def create_lobby(channel_id: int, host_id: int, host_name: str) -> Lobby:
     host_player = Player(id=str(host_id), name=host_name)
     lobby = Lobby(host=host_player)
-    _lobbies[channel_id] = lobby
+    set_lobby(channel_id, lobby)
     return lobby
 
-def get_lobby(channel_id: int) -> Lobby | None:
-    return _lobbies.get(channel_id)
-
-def remove_lobby(channel_id: int) -> None:
-    _lobbies.pop(channel_id, None)
-
 async def start_game(channel_id: int) -> Game:
-    lobby = _lobbies.pop(channel_id)
+    lobby = get_lobby(channel_id)
     random.shuffle(lobby.players)
     real = Game(
         players    = lobby.players,
         config     = lobby.config,
         repository = _repo,
+        host_id    = lobby.host.id,
         channel_id = channel_id
     )
-    print(f"start_game: new Game id={id(real)}")
+    remove_lobby(channel_id)
     real.add_phase_listener(on_phase_change)
+    set_game(channel_id, real)
     await real.start()
-    _games[channel_id] = real
     return real
 
 
@@ -820,11 +1001,10 @@ async def on_phase_change(game: Game, old_phase: Phase, new_phase: Phase):
     print(f"[GameManager] Phase changed  ({old_phase} -> {new_phase}) for game {game.channel_id}")
     game_channel = _bot.get_channel(game.channel_id)
     if new_phase == Phase.JUDGING:
-        await reveal_submissions(game_channel, game)
-        await game_channel.send(
-            "🔍 All responses are in! The judge is now reviewing the submissions. "
-            "Please wait for the judge to select the best response."
-        )
+        async def on_judge_button(interaction, game):
+            return await handle_judge(interaction, game, on_judge_pick=on_judge_button)
+
+        await reveal_submissions(game_channel, game, on_judge_button=on_judge_button)
         return
 
     elif new_phase == Phase.SUBMISSIONS:
@@ -836,24 +1016,15 @@ async def on_phase_change(game: Game, old_phase: Phase, new_phase: Phase):
             winner_score = winner.score if winner else "?"
             cards_str = "\n".join(f"> **{c.text}**" for c in winner_cards)
             await game_channel.send(
-                f"🏆 **{winner_name}** was selected as the winner!\n"
-                f"Winning card(s):\n{cards_str}\n"
+                f"🏆 **{winner_name}** was selected as the winner! Winning card(s):\n{cards_str}\n"
                 f"**{winner_name}** now has **{winner_score}** point{'s' if winner_score != 1 else ''}!"
             )
-        
-        await announce_round_start(game_channel, game)
-        
+            await asyncio.sleep(2)
+        def on_play_button(interaction, game):
+            return handle_play(interaction, game, bot=_bot, as_button=True)
+        await announce_round_start(game_channel, game, on_play_button=on_play_button)
 
     await asyncio.sleep(2)
-
-def get_game(channel_id: int) -> Game | None:
-    game = _games.get(channel_id)
-    print(f"get_game: Game id={id(game) if game else None}")
-    return game
-
-def remove_game(channel_id: int) -> None:
-    _games.pop(channel_id, None)
-
 
 # .\src\discord_bot\services\lobby.py
 
@@ -869,13 +1040,44 @@ class Lobby:
     config:  GameConfig   = field(default_factory=GameConfig)
     join_message_id: int = 0
 
+# .\src\discord_bot\services\state_manager.py
+
+from cards_engine.card_repository import CardRepository
+from cards_engine.game import Game
+
+_repo = CardRepository()
+_games = {}
+_lobbies = {}
+
+def get_repository():
+    return _repo
+
+def get_game(channel_id):
+    return _games.get(channel_id)
+
+def set_game(channel_id, game):
+    _games[channel_id] = game
+
+def remove_game(channel_id):
+    _games.pop(channel_id, None)
+
+def get_lobby(channel_id):
+    return _lobbies.get(channel_id)
+
+def set_lobby(channel_id, lobby):
+    _lobbies[channel_id] = lobby
+
+def remove_lobby(channel_id):
+    _lobbies.pop(channel_id, None)
+
+
 # .\src\discord_bot\views\draft_view.py
 
 # discord_bot/views/draft_view.py
 
 from discord import ui, SelectOption, Interaction
 from cards_engine.game_phases import Phase
-from discord_bot.services.game_manager import get_game
+from discord_bot.services.state_manager import get_game
 
 class DraftView(ui.View):
     """A persistent ephemeral view that walks a single player through
@@ -946,21 +1148,18 @@ from discord import ui, ButtonStyle, Interaction
 from cards_engine.player import Player
 
 class JoinView(ui.View):
-    def __init__(self, lobby):
+    def __init__(self, lobby, on_join_button=None):
         super().__init__(timeout=None)
         self.lobby = lobby
+        self.on_join_button = on_join_button
         self.join_button.label = f"Join Game ({len(self.lobby.players)})"
 
     @ui.button(label="Join Game", style=ButtonStyle.primary, custom_id="join_game")
     async def join_button(self, button, inter: Interaction):
-        user = inter.user
-        p = Player(id=str(user.id), name=user.nick or user.name)
-        if any(pl.id == p.id for pl in self.lobby.players):
-            return await inter.response.send_message("You’ve already joined!", ephemeral=True)
-
-        self.lobby.players.append(p)
         button.label = f"Join Game ({len(self.lobby.players)})"
         await inter.response.edit_message(view=self)
+        await self.on_join_button(inter)
+
 
 
 # .\src\discord_bot\views\judge_button_view.py
@@ -979,7 +1178,7 @@ class JudgeButtonView(View):
 
     @discord.ui.button(label="Judge!", style=discord.ButtonStyle.primary)
     async def judge_button(self, button, interaction):
-        self.on_judge_button(interaction, self.game)
+        await self.on_judge_button(interaction, self.game)
 
 # .\src\discord_bot\views\judge_view.py
 
@@ -994,7 +1193,7 @@ class JudgeView(View):
         self.on_judge_pick = on_judge_pick
 
         # Convert submissions dict to a list for index mapping
-        self.sub_list = list(self.game.state.submissions.items())  # [(player_id, [Card, Card, ...]), ...]
+        self.sub_list = self.game.state.submissions_shuffled
         
         # Build options with card texts, not objects or ids
         options = [
@@ -1015,7 +1214,6 @@ class JudgeView(View):
         self.add_item(self.select)
 
     async def on_pick(self, interaction: discord.Interaction):
-        print("JudgeView.on_pick")
         if str(interaction.user.id) != str(self.judge_id):
             await interaction.response.send_message("Only the judge can select!", ephemeral=True)
             return
@@ -1023,43 +1221,28 @@ class JudgeView(View):
         picked_idx = int(interaction.data["values"][0])
         player_id, winner_cards = self.sub_list[picked_idx]
         await interaction.response.send_message(
-            f"🏆 {interaction.user.mention} has selected <@{player_id}> as the winner with: "
+            "Selected the answers: "
             f"{', '.join(card.text for card in winner_cards)}",
             ephemeral=True
         )
-        await self.on_judge_pick(player_id)
+        channel = interaction.channel
+        await self.on_judge_pick(self.game, player_id)
         self.stop()
 
 # .\src\discord_bot\views\play_button_view.py
 
-# play_button_view.py
-
 import discord
 from discord.ui import View
-from discord_bot.views.play_view import PlayView
 
 class PlayButtonView(View):
-    def __init__(self, game, bot):
+    def __init__(self, game, on_play_button):
         super().__init__(timeout=None)
         self.game = game
-        self.bot = bot
+        self.on_play_button = on_play_button
 
     @discord.ui.button(label="Select responses!", style=discord.ButtonStyle.primary)
     async def play_button(self, button, interaction):
-        player = self.game.state.player_by_id(str(interaction.user.id))
-        if not player:
-            await interaction.response.send_message("You are not in this game!", ephemeral=True)
-            return
-        if self.game.state.current_judge.id == player.id:
-            await interaction.response.send_message("You are the judge this round!", ephemeral=True)
-            return
-        view = PlayView(self.game.channel_id, str(interaction.user.id), self.bot)
-        await interaction.response.send_message(
-            "Select your responses:",
-            view=view,
-            ephemeral=True
-        )
-
+        await self.on_play_button(interaction, self.game)
 
 # .\src\discord_bot\views\play_view.py
 
@@ -1067,13 +1250,13 @@ import discord
 import random
 from discord.ui import View, Select, Button
 from cards_engine.game_phases import Phase
-from discord_bot.services.game_manager import get_game
+from discord_bot.services.state_manager import get_game
 
 class PlayView(View):
     def __init__(self, channel_id, player_id, bot, picks=None, pick_index=0):
         super().__init__(timeout=60)
         self.channel_id = channel_id
-        self.player_id = player_id
+        self.player_id = str(player_id)
         self.bot = bot
         self.picks = picks or []
         self.pick_index = pick_index
@@ -1159,16 +1342,16 @@ class PlayView(View):
 # src/discord_bot/views/setup_view.py
 
 from dataclasses import replace
-import discord
 from discord import Interaction, ButtonStyle, SelectOption
 from discord.ui import View, Button, Select
-from discord_bot.services.game_flow     import announce_round_start
-from cards_engine.game_config           import GameConfig
-from cards_engine.game_phases           import Phase
-from discord_bot.services.game_manager  import get_lobby, get_repository, start_game, remove_lobby
-
-# You can increase this if you add more pages
-MAX_PAGE = 2
+from cards_engine.game_config import (
+        GameConfig,
+        hand_size_min, hand_size_max,
+        max_players_min, max_players_max,
+        blank_count_min, blank_count_max,
+    )
+from discord_bot.services.game_manager  import start_game
+from discord_bot.services.state_manager import get_lobby, remove_lobby, get_repository
 
 MAX_PAGE = 2
 
@@ -1189,7 +1372,8 @@ class SetupView(View):
         repository   = get_repository()
         expansions   = repository.available_expansions()
         regions      = repository.available_regions()
-        sizes        = list(range(5, 16))
+        sizes        = list(range(hand_size_min, hand_size_max + 1))
+        max_players_opts = list(range(max_players_min, max_players_max + 1))
 
         # Defaults
         if not self.lobby.config.expansions:
@@ -1224,9 +1408,9 @@ class SetupView(View):
             SelectOption(
                 label=f"Min. Blanks Per Prompt: {n}",
                 value=str(n),
-                default=(n == getattr(self.lobby.config, "min_blanks", 1))
+                default=(n == self.lobby.config.min_blanks)
             )
-            for n in range(1, 6)
+            for n in range(blank_count_min, blank_count_max + 1)
         ]
         self.sel_min_blanks = Select(
             placeholder="Minimum Blanks Per Prompt",
@@ -1240,9 +1424,9 @@ class SetupView(View):
             SelectOption(
                 label=f"Max. Blanks Per Prompt: {n}",
                 value=str(n),
-                default=(n == getattr(self.lobby.config, "max_blanks", 3))
+                default=(n == self.lobby.config.max_blanks)
             )
-            for n in range(1, 6)
+            for n in range(blank_count_min, blank_count_max + 1)
         ]
         self.sel_max_blanks = Select(
             placeholder="Maximum Blanks Per Prompt",
@@ -1252,10 +1436,18 @@ class SetupView(View):
         )
         self.sel_max_blanks.callback = self.on_select_max_blanks
 
+        self.sel_max_players = Select(
+            placeholder="Max Players",
+            options=[SelectOption(label=f"Max Players: {n}", value=str(n), default=(n == self.lobby.config.max_players)) for n in max_players_opts],
+            min_values=1, max_values=1, row=2
+        )
+        self.sel_max_players.callback = self.on_select_max_players
+
         # ========== PAGE CONTENT ==========
         if self.page == 1:
             self.add_item(self.sel_packs)    # row=0
             self.add_item(self.sel_regions)  # row=1
+            self.add_item(self.sel_max_players)  # row=2
         elif self.page == 2:
             self.add_item(self.sel_size)         # row=0
             self.add_item(self.sel_min_blanks)   # row=1
@@ -1340,6 +1532,11 @@ class SetupView(View):
             opt.default = (int(opt.value) == max_val)
         await interaction.response.edit_message(view=SetupView(self.channel_id, self.bot, self.page))
 
+    async def on_select_max_players(self, interaction: Interaction):
+        max_players = int(interaction.data["values"][0])
+        self.lobby.config = replace(self.lobby.config, max_players=max_players)
+        await interaction.response.edit_message(view=SetupView(self.channel_id, self.bot, self.page))
+
     # ========== BUTTON HANDLERS ==========
 
     async def interaction_check(self, interaction: Interaction):
@@ -1381,7 +1578,7 @@ class SetupView(View):
             return
 
         game = await start_game(self.channel_id)
-        await interaction.response.edit_message(content="# BUBBA'S CHALLENGE BEGINS!", view=None)
+        await interaction.response.edit_message(content="Bubba's Challenge BEGINS ...", view=None)
         channel = self.bot.get_channel(self.channel_id)
         
         lobby = get_lobby(self.channel_id)
@@ -1396,8 +1593,6 @@ class SetupView(View):
         judge_current_name = judge_current.name if judge_current else "Unknown"
         prompt_card = getattr(game.state, "current_prompt", None)
         prompt_text = prompt_card.text if prompt_card else "No prompt selected."
-
-        await announce_round_start(channel, game)
 
     async def on_cancel(self, interaction: Interaction):
         remove_lobby(self.channel_id)

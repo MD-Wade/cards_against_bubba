@@ -1,7 +1,9 @@
 import discord
 from discord.ext import commands
-from discord import Option
-from discord_bot.services.game_manager  import create_lobby, get_game
+import asyncio
+from discord_bot.services.state_manager import get_game, remove_game
+from discord_bot.services.game_manager  import create_lobby
+from discord_bot.services.game_flow     import handle_play, handle_judge, handle_draft, handle_stop, handle_skip, handle_join
 from discord_bot.views.setup_view       import SetupView
 from discord_bot.views.join_view        import JoinView
 from discord_bot.views.draft_view       import DraftView
@@ -12,6 +14,8 @@ from cards_engine.player                import Player
 from cards_engine.game                  import Game
 from discord_bot.views.judge_button_view import JudgeButtonView
 
+guild_ids_master = [1075249749357252680, 1167164629844234270, 972953179710963762]
+
 class GameCog(commands.Cog):
     def __init__(self, bot):
         self.bot = bot
@@ -19,7 +23,6 @@ class GameCog(commands.Cog):
     @commands.slash_command(
             name="start", 
             description="Create and configure a new game of Cards Against Bubba",
-            guild_ids=[1075249749357252680, 1167164629844234270]
             )
     async def start(self, ctx: discord.ApplicationContext):
         existing = get_game(ctx.channel_id)
@@ -32,95 +35,78 @@ class GameCog(commands.Cog):
 
         lobby = create_lobby(
             channel_id=ctx.channel_id,
-            host_id=ctx.author.id,
+            host_id=str(ctx.author.id),
             host_name=ctx.author.display_name
         )
 
         player_host = Player(id=str(ctx.author.id), name=ctx.author.display_name)
         lobby.players.append(player_host)
 
-        view_join = JoinView(lobby)
+        async def on_join_button(interaction: discord.Interaction):
+            """Handle the join button click."""
+            await handle_join(interaction)
+
+        view_join = JoinView(lobby, on_join_button=on_join_button)
         join_message = await ctx.channel.send(
             f"👋 {ctx.author.display_name} started a new game of Cards Against Bubba! Join with `/join` or by clicking the button!",
             view=view_join,
         )
+        await asyncio.sleep(1)
         lobby.join_message_id = join_message.id
 
         view_setup = SetupView(ctx.channel_id, bot=self.bot)
         await ctx.respond(
-            "👋 Host panel: Select packs and regions, then set hand size and draft mode, and ▶️ Launch!",
+            content="CONFIGURATION: Please configure which packs and regions to enable, as well as other game settings.",
             view=view_setup,
             ephemeral=True
         )
 
     @commands.slash_command(
+            name="join",
+            description="Join the current game of Cards Against Bubba",
+            )
+    async def join(self, ctx: discord.ApplicationContext):
+        """Join the current game."""
+        await handle_join(ctx)
+
+    @commands.slash_command(
             name="draft", 
             description="Pick from your current draft pack",
-            guild_ids=[1075249749357252680, 1167164629844234270]
             )
     async def draft(self, ctx: discord.ApplicationContext):
-        game = get_game(ctx.channel_id)
-        if not game or game.state.phase is not Phase.DRAFT_PICKING:
-            return await ctx.respond("No draft in progress.", ephemeral=True)
+        await handle_draft(ctx, game=get_game(ctx.channel_id))
 
-        # send (or re‐use) one ephemeral message per player
-        view = DraftView(ctx.channel_id, str(ctx.author.id))
-        await ctx.respond(
-            "Your draft pack, pick one card:",
-            view=view,
-            ephemeral=True
-        )
+    @commands.slash_command(
+            name="stop",
+            description="STOP! STOP!!!!!!",
+            )
+    async def stop(self, ctx: discord.ApplicationContext):
+        await handle_stop(ctx, get_game, remove_game)
 
     @commands.slash_command(
         name="play",
         description="Select cards to play as a response to the current prompt",
-        guild_ids=[1075249749357252680, 1167164629844234270]
     )
     async def play(self, ctx: discord.ApplicationContext):
-        game = get_game(ctx.channel_id)
-        if not game or game.state.phase != Phase.SUBMISSIONS:
-            return await ctx.respond("No active round to play cards.", ephemeral=True)
-
-        player = game.state.player_by_id(str(ctx.author.id))
-        if not player:
-            return await ctx.respond("You are NOT in this game!", ephemeral=True)
-        view = PlayView(ctx.channel_id, str(ctx.author.id), self.bot)
-        if view.pick_count == 1:
-            msg = "Select a response to play for this prompt."
-        else:
-            msg = "Select a response to play for the first blank of this prompt."
-        await ctx.respond(
-            msg,
-            view=view,
-            ephemeral=True
-        )
+        await handle_play(ctx, get_game(ctx.channel_id), bot=self.bot)
 
     @commands.slash_command(
         name="judge",
         description="Select the best response as the judge",
-        guild_ids=[1075249749357252680, 1167164629844234270]
     )
     async def judge(self, ctx: discord.ApplicationContext):
-        game = get_game(ctx.channel_id)
-        if not game or game.state.phase != Phase.JUDGING:
-            return await ctx.respond("No active round to judge responses.", ephemeral=True)
-
-        player = game.state.player_by_id(str(ctx.author.id))
-        if not player or player.id != game.state.current_judge.id:
-            return await ctx.respond("You are NOT the judge this round!", ephemeral=True)
-
-        async def on_judge_pick(player_id: str):
+        async def on_judge_pick(game, player_id):
             await self.on_judge_pick(ctx.channel_id, player_id)
+        await handle_judge(ctx, game=get_game(ctx.channel_id), on_judge_pick=on_judge_pick)
 
-        view = JudgeView(game, judge_id=game.state.current_judge.id, on_judge_pick=on_judge_pick)
-        await ctx.respond(
-            "Select the best response from the submissions.:",
-            view=view,
-            ephemeral=True
-        )
+    @commands.slash_command(
+        name="skip",
+        description="Discards the current prompt and moves to the next one.",
+    )
+    async def skip(self, ctx: discord.ApplicationContext):
+        await handle_skip(ctx, bot=self.bot, game=get_game(ctx.channel_id))
 
     async def on_judge_pick(self, channel_id: int, player_id: str):
-        print("GameCog.on_judge_pick")
         game = get_game(channel_id)
         await game.judge(player_id)
 
@@ -130,7 +116,7 @@ class GameCog(commands.Cog):
             await interaction.response.send_message("Only the judge can judge this round!", ephemeral=True)
             return
         # Build the actual judge view
-        view = JudgeView(game, judge_id=game.state.current_judge.id, on_judge_pick=...)  # etc.
+        view = JudgeView(game, judge_id=game.state.current_judge.id, on_judge_pick=self.on_judge_pick)
         await interaction.response.send_message(
             "Select the best response:",
             view=view,

@@ -1,7 +1,8 @@
 from enum import Enum
 
 class Phase(str, Enum):
-    WAITING       = "waiting_for_players"
-    DRAFT_PICKING = "draft_picking"
-    SUBMISSIONS   = "submissions"
-    JUDGING       = "judging"
+    WAITING         = "waiting_for_players"
+    DRAFT_PICKING   = "draft_picking"
+    SUBMISSIONS     = "submissions"
+    JUDGING         = "judging"
+    FINISHED        = "finished"

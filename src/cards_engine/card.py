@@ -50,13 +50,13 @@ class Card:
                     prev_char = self.text[start-1] if start > 0 else ""
                     if prev_char not in ".!?" and re.match(r"^(The|A|An)\b", resp):
                         resp = resp[0].lower() + resp[1:]
-                    return f"{resp}"
+                    return f"**{resp}**"
                 return match.group(0)
             replacer.idx = 0
             out = re.sub(r'_{3,}', replacer, out)
             return out
         else:
-            resp_text = " ".join(f"{resp}" for resp in responses)
+            resp_text = " ".join(f"**{resp}**" for resp in responses)
             if resp_text:
                 out = f"{out} {resp_text}"
             return out

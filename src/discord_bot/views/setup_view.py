@@ -1,16 +1,17 @@
 # src/discord_bot/views/setup_view.py
 
 from dataclasses import replace
-import discord
 from discord import Interaction, ButtonStyle, SelectOption
 from discord.ui import View, Button, Select
-from discord_bot.services.game_flow     import announce_round_start
-from cards_engine.game_config           import GameConfig
-from cards_engine.game_phases           import Phase
-from discord_bot.services.game_manager  import get_lobby, get_repository, start_game, remove_lobby
-
-# You can increase this if you add more pages
-MAX_PAGE = 2
+from cards_engine.game_config import (
+        GameConfig,
+        hand_size_min, hand_size_max,
+        max_players_min, max_players_max,
+        blank_count_min, blank_count_max,
+        score_limit_min, score_limit_max
+    )
+from discord_bot.services.game_manager  import start_game
+from discord_bot.services.state_manager import get_lobby, remove_lobby, get_repository
 
 MAX_PAGE = 2
 
@@ -31,7 +32,8 @@ class SetupView(View):
         repository   = get_repository()
         expansions   = repository.available_expansions()
         regions      = repository.available_regions()
-        sizes        = list(range(5, 16))
+        sizes        = list(range(hand_size_min, hand_size_max + 1))
+        max_players_opts = list(range(max_players_min, max_players_max + 1))
 
         # Defaults
         if not self.lobby.config.expansions:
@@ -66,9 +68,9 @@ class SetupView(View):
             SelectOption(
                 label=f"Min. Blanks Per Prompt: {n}",
                 value=str(n),
-                default=(n == getattr(self.lobby.config, "min_blanks", 1))
+                default=(n == self.lobby.config.min_blanks)
             )
-            for n in range(1, 6)
+            for n in range(blank_count_min, blank_count_max + 1)
         ]
         self.sel_min_blanks = Select(
             placeholder="Minimum Blanks Per Prompt",
@@ -82,9 +84,9 @@ class SetupView(View):
             SelectOption(
                 label=f"Max. Blanks Per Prompt: {n}",
                 value=str(n),
-                default=(n == getattr(self.lobby.config, "max_blanks", 3))
+                default=(n == self.lobby.config.max_blanks)
             )
-            for n in range(1, 6)
+            for n in range(blank_count_min, blank_count_max + 1)
         ]
         self.sel_max_blanks = Select(
             placeholder="Maximum Blanks Per Prompt",
@@ -94,14 +96,31 @@ class SetupView(View):
         )
         self.sel_max_blanks.callback = self.on_select_max_blanks
 
+        self.sel_score_limit = Select(
+            placeholder="Score Limit",
+            options=[SelectOption(label=f"Score Limit: {n}", value=str(n), default=(n == self.lobby.config.score_limit))
+                     for n in range(score_limit_min, score_limit_max + 1)],
+            min_values=1, max_values=1, row=3
+        )
+        self.sel_score_limit.callback = self.on_select_score_limit
+
+        self.sel_max_players = Select(
+            placeholder="Max Players",
+            options=[SelectOption(label=f"Max Players: {n}", value=str(n), default=(n == self.lobby.config.max_players)) for n in max_players_opts],
+            min_values=1, max_values=1, row=2
+        )
+        self.sel_max_players.callback = self.on_select_max_players
+
         # ========== PAGE CONTENT ==========
         if self.page == 1:
             self.add_item(self.sel_packs)    # row=0
             self.add_item(self.sel_regions)  # row=1
+            self.add_item(self.sel_max_players)  # row=2
         elif self.page == 2:
             self.add_item(self.sel_size)         # row=0
             self.add_item(self.sel_min_blanks)   # row=1
             self.add_item(self.sel_max_blanks)   # row=2
+            self.add_item(self.sel_score_limit)   # row=3
 
         # ========== NAVIGATION/CONTROL BUTTONS (ROW 4) ==========
 
@@ -113,10 +132,10 @@ class SetupView(View):
         left_disabled = self.page == 1
         right_disabled = self.page == MAX_PAGE
 
-        self.add_item(Button(
-            emoji=draft_emoji, style=draft_style, row=4,
-            custom_id="toggle_draft"
-        ))
+        #self.add_item(Button(
+        #    emoji=draft_emoji, style=draft_style, row=4,
+        #    custom_id="toggle_draft"
+        #))
         self.add_item(Button(
             emoji="◀️", style=ButtonStyle.primary, row=4,
             custom_id="page_left", disabled=left_disabled
@@ -182,6 +201,18 @@ class SetupView(View):
             opt.default = (int(opt.value) == max_val)
         await interaction.response.edit_message(view=SetupView(self.channel_id, self.bot, self.page))
 
+    async def on_select_max_players(self, interaction: Interaction):
+        max_players = int(interaction.data["values"][0])
+        self.lobby.config = replace(self.lobby.config, max_players=max_players)
+        await interaction.response.edit_message(view=SetupView(self.channel_id, self.bot, self.page))
+
+    async def on_select_score_limit(self, interaction: Interaction):
+        score_limit = int(interaction.data["values"][0])
+        self.lobby.config = replace(self.lobby.config, score_limit=score_limit)
+        for opt in self.sel_score_limit.options:
+            opt.default = (int(opt.value) == score_limit)
+        await interaction.response.edit_message(view=SetupView(self.channel_id, self.bot, self.page))
+
     # ========== BUTTON HANDLERS ==========
 
     async def interaction_check(self, interaction: Interaction):
@@ -223,7 +254,7 @@ class SetupView(View):
             return
 
         game = await start_game(self.channel_id)
-        await interaction.response.edit_message(content="# BUBBA'S CHALLENGE BEGINS!", view=None)
+        await interaction.response.edit_message(content="Bubba's Challenge BEGINS ...", view=None)
         channel = self.bot.get_channel(self.channel_id)
         
         lobby = get_lobby(self.channel_id)
@@ -238,8 +269,6 @@ class SetupView(View):
         judge_current_name = judge_current.name if judge_current else "Unknown"
         prompt_card = getattr(game.state, "current_prompt", None)
         prompt_text = prompt_card.text if prompt_card else "No prompt selected."
-
-        await announce_round_start(channel, game)
 
     async def on_cancel(self, interaction: Interaction):
         remove_lobby(self.channel_id)

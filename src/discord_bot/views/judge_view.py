@@ -9,7 +9,7 @@ class JudgeView(View):
         self.on_judge_pick = on_judge_pick
 
         # Convert submissions dict to a list for index mapping
-        self.sub_list = list(self.game.state.submissions.items())  # [(player_id, [Card, Card, ...]), ...]
+        self.sub_list = self.game.state.submissions_shuffled
         
         # Build options with card texts, not objects or ids
         options = [
@@ -30,7 +30,6 @@ class JudgeView(View):
         self.add_item(self.select)
 
     async def on_pick(self, interaction: discord.Interaction):
-        print("JudgeView.on_pick")
         if str(interaction.user.id) != str(self.judge_id):
             await interaction.response.send_message("Only the judge can select!", ephemeral=True)
             return
@@ -38,9 +37,10 @@ class JudgeView(View):
         picked_idx = int(interaction.data["values"][0])
         player_id, winner_cards = self.sub_list[picked_idx]
         await interaction.response.send_message(
-            f"🏆 {interaction.user.mention} has selected <@{player_id}> as the winner with: "
+            "Selected the answers: "
             f"{', '.join(card.text for card in winner_cards)}",
             ephemeral=True
         )
-        await self.on_judge_pick(player_id)
+        channel = interaction.channel
+        await self.on_judge_pick(self.game, player_id)
         self.stop()

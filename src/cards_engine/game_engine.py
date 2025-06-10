@@ -18,6 +18,7 @@ class GameEngine:
             )
 
         state.submissions.clear()
+        state.submissions_shuffled = []
         for p in state.players:
             p.hand = [state.white_deck.pop() for _ in range(state.hand_size)]
             p.score = 0
@@ -28,6 +29,7 @@ class GameEngine:
 
     def draw_prompt(self, state: GameState) -> None:
         state.submissions.clear()
+        state.submissions_shuffled = []
         state.current_prompt = state.black_deck.pop()
 
     def submit_cards(self, state: GameState, player_id: str, cards: List[Card]) -> bool:
@@ -52,10 +54,6 @@ class GameEngine:
         state.submissions[player_id] = cards
 
         all_in = self._all_non_judges_submitted(state)
-        if all_in:
-            print(f"[DEBUG] Player {player_id} submitted {len(cards)} cards.")
-        else:
-            print(f"[DEBUG] Player {player_id} has submitted {len(cards)} cards, waiting for others...")
         return all_in
             
 
@@ -65,6 +63,9 @@ class GameEngine:
         state.phase_check(Phase.JUDGING)
         winner = self.find_player(state, winner_id)
         winner.score += 1
+
+        if winner.score >= state.score_limit:
+            return Phase.FINISHED
 
         self._replenish_hands(state)
         state.judge_index = (state.judge_index + 1) % len(state.players)
@@ -125,6 +126,18 @@ class GameEngine:
             return Phase.SUBMISSIONS
         return Phase.DRAFT_PICKING
 
+    def skip_prompt(self, state: GameState, player_id: str) -> Phase:
+        """Skip the current prompt and draw a new one."""
+        state.phase_check(Phase.SUBMISSIONS)
+        player = self.find_player(state, player_id)
+
+        if state.players[state.judge_index] is not player:
+            raise RuntimeError("Only the Judge can skip prompts.")
+
+        self.rollback_submitted_cards(state)
+        self.draw_prompt(state)
+        return Phase.SUBMISSIONS
+
     # ─── Helpers ────────────────────────────────────────────────
 
     def find_player(self, state: GameState, player_id: str) -> Player:
@@ -135,12 +148,9 @@ class GameEngine:
         for p in state.players:
             name = p.name if p.name else p.id
             if p is judge:
-                print(f"[DEBUG] Player {name} is the judge.")
                 continue
             if p.id not in state.submissions:
-                print(f"[DEBUG] Player {name} has not submitted.")
                 return False
-        print("[DEBUG] All non-judges have submitted.")
         return True
 
     def _is_judge(self, state: GameState, player: Player) -> bool:
@@ -150,3 +160,14 @@ class GameEngine:
         for p in state.players:
             while len(p.hand) < state.hand_size:
                 p.hand.append(state.white_deck.pop())
+
+    def rollback_submitted_cards(self, state: GameState) -> None:
+        """Rollback the submitted cards for all players."""
+        # For every submission, return the cards to the player's hand
+        for player_id, cards in state.submissions.items():
+            player = state.player_by_id(player_id)
+            if player:
+                player.hand.extend(cards)
+        # Clear submissions
+        state.submissions.clear()
+        state.submissions_shuffled = []

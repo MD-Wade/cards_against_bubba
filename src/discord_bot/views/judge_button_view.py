@@ -12,4 +12,4 @@ class JudgeButtonView(View):
 
     @discord.ui.button(label="Judge!", style=discord.ButtonStyle.primary)
     async def judge_button(self, button, interaction):
-        self.on_judge_button(interaction, self.game)
+        await self.on_judge_button(interaction, self.game)
