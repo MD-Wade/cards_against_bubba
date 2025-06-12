@@ -35,7 +35,7 @@ async def reveal_submissions(channel, game, on_judge_button, delay=3.0):
         on_judge_button=lambda interaction, game: handle_judge(interaction, game, on_judge_pick=on_judge_pick)
     )
     await channel.send(
-        f"All submissions revealed! <@{judge.id}>, please select the best response using by clicking the button below.",
+        f"All submissions revealed! <@{judge.id}>, please select the best response by clicking the button below.",
         view=view_judge_button
     )
 
